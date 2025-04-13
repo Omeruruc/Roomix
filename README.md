@@ -1,3 +1,2 @@
 # Ding-Chat
-
-[Edit in StackBlitz next generation editor ⚡️](https://stackblitz.com/~/github.com/Omeruruc/Ding-Chat)
+https://peppy-profiterole-4bd48b.netlify.app
