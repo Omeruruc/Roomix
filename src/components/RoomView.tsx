@@ -22,7 +22,6 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
 
   useEffect(() => {
     const fetchRoomUsers = async () => {
-      // First get all room users
       const { data: roomUsersData, error: roomUsersError } = await supabase
         .from('room_users')
         .select('user_id')
@@ -38,7 +37,6 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
         return;
       }
 
-      // Use the secure function to get user emails
       const { data: userData, error: userError } = await supabase
         .rpc('get_user_emails', {
           user_ids: roomUsersData.map(u => u.user_id)
@@ -97,9 +95,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
         </motion.button>
       </div>
 
-      {showChat ? (
-        <Chat session={session} roomId={roomId} />
-      ) : (
+      <div className={showChat ? 'hidden' : ''}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {roomUsers.map((user) => (
             <StudyTimer
@@ -111,7 +107,9 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
             />
           ))}
         </div>
-      )}
+      </div>
+
+      {showChat && <Chat session={session} roomId={roomId} />}
     </div>
   );
 }

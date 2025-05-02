@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -24,9 +24,11 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
     subject: ''
   });
   const [subject, setSubject] = useState('');
+  const lastUpdateRef = useRef<number>(Date.now());
+  const timerRef = useRef<NodeJS.Timeout>();
+  const localTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    // Load existing timer state from Supabase
     const loadTimerState = async () => {
       const { data, error } = await supabase
         .from('study_timers')
@@ -36,7 +38,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
         .maybeSingle();
 
       if (error) {
-        toast.error('Failed to load timer state');
+        console.error('Failed to load timer state:', error);
         return;
       }
 
@@ -46,13 +48,15 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
           time: data.elapsed_time,
           subject: data.subject || ''
         });
+        localTimeRef.current = data.elapsed_time;
         setSubject(data.subject || '');
+        lastUpdateRef.current = Date.now();
       }
     };
 
     loadTimerState();
 
-    // Subscribe to timer updates
+    // Subscribe to real-time changes
     const channel = supabase
       .channel(`timer:${roomId}:${userId}`)
       .on(
@@ -65,11 +69,14 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
         },
         (payload) => {
           if (payload.new) {
+            const newData = payload.new;
             setTimerState({
-              isRunning: payload.new.is_running,
-              time: payload.new.elapsed_time,
-              subject: payload.new.subject || ''
+              isRunning: newData.is_running,
+              time: newData.elapsed_time,
+              subject: newData.subject || ''
             });
+            localTimeRef.current = newData.elapsed_time;
+            lastUpdateRef.current = Date.now();
           }
         }
       )
@@ -77,40 +84,56 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
 
     return () => {
       channel.unsubscribe();
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
     };
   }, [userId, roomId]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
 
-    if (timerState.isRunning && isCurrentUser) {
-      interval = setInterval(async () => {
+    if (timerState.isRunning) {
+      timerRef.current = setInterval(() => {
+        localTimeRef.current += 1;
         setTimerState(prev => ({
           ...prev,
-          time: prev.time + 1
+          time: localTimeRef.current
         }));
 
-        // Update timer state in Supabase every 5 seconds
-        if ((timerState.time + 1) % 5 === 0) {
-          const { error } = await supabase
-            .from('study_timers')
-            .upsert({
-              user_id: userId,
-              room_id: roomId,
-              elapsed_time: timerState.time + 1,
-              is_running: true,
-              subject: timerState.subject
-            });
+        // Update server every 5 seconds if this is the current user's timer
+        if (isCurrentUser && Date.now() - lastUpdateRef.current >= 5000) {
+          const updateServerState = async () => {
+            const { error } = await supabase
+              .from('study_timers')
+              .upsert({
+                user_id: userId,
+                room_id: roomId,
+                elapsed_time: localTimeRef.current,
+                is_running: true,
+                subject: timerState.subject
+              });
 
-          if (error) {
-            toast.error('Failed to update timer state');
-          }
+            if (error) {
+              console.error('Failed to update server state:', error);
+            } else {
+              lastUpdateRef.current = Date.now();
+            }
+          };
+
+          updateServerState();
         }
       }, 1000);
     }
 
-    return () => clearInterval(interval);
-  }, [timerState.isRunning, userId, roomId, isCurrentUser]);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [timerState.isRunning, userId, roomId, isCurrentUser, timerState.subject]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -134,7 +157,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
       .upsert({
         user_id: userId,
         room_id: roomId,
-        elapsed_time: timerState.time,
+        elapsed_time: localTimeRef.current,
         is_running: newIsRunning,
         subject: subject || timerState.subject
       });
@@ -149,6 +172,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
       isRunning: newIsRunning,
       subject: subject || prev.subject
     }));
+    lastUpdateRef.current = Date.now();
   };
 
   const handleReset = async () => {
@@ -169,11 +193,13 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
       return;
     }
 
+    localTimeRef.current = 0;
     setTimerState(prev => ({
       ...prev,
       time: 0,
       isRunning: false
     }));
+    lastUpdateRef.current = Date.now();
   };
 
   return (

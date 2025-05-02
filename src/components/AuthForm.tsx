@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, LogIn, UserPlus } from 'lucide-react';
+import { Mail, Lock, LogIn, UserPlus, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface AuthFormProps {
   setIsLoading: (loading: boolean) => void;
+  onBack: () => void;
 }
 
-export default function AuthForm({ setIsLoading }: AuthFormProps) {
+export default function AuthForm({ setIsLoading, onBack }: AuthFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
@@ -91,6 +92,17 @@ export default function AuthForm({ setIsLoading }: AuthFormProps) {
           filter: 'brightness(0.3)'
         }}
       />
+
+      {/* Back Button */}
+      <motion.button
+        onClick={onBack}
+        className="absolute top-4 left-4 px-4 py-2 bg-gray-800/50 backdrop-blur-sm rounded-xl text-white flex items-center gap-2 z-50 hover:bg-gray-800/70 transition-all duration-200"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <ArrowLeft className="w-5 h-5" />
+        Back to Home
+      </motion.button>
 
       {/* Animated Circles */}
       {circles.map((circle, index) => (
