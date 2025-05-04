@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MessageCircle, UserCircle } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import AuthForm from './components/AuthForm';
@@ -7,6 +7,7 @@ import RoomList from './components/RoomList';
 import ProfileSettings from './components/ProfileSettings';
 import LandingPage from './components/LandingPage';
 import { useAuth } from './hooks/useAuth';
+import { supabase } from './lib/supabase';
 
 function App() {
   const { session, signOut } = useAuth();
@@ -14,6 +15,31 @@ function App() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+
+  // Effect to handle room cleanup on sign out
+  useEffect(() => {
+    if (!session && selectedRoomId) {
+      setSelectedRoomId(null);
+    }
+  }, [session]);
+
+  const handleSignOut = async () => {
+    try {
+      // Remove user from all rooms before signing out
+      if (session) {
+        await supabase
+          .from('room_users')
+          .delete()
+          .eq('user_id', session.user.id);
+      }
+      
+      // Then sign out
+      await signOut();
+      setSelectedRoomId(null);
+    } catch (error) {
+      console.error('Error during sign out:', error);
+    }
+  };
 
   if (!session && !showAuth) {
     return <LandingPage onAuthClick={() => setShowAuth(true)} />;
@@ -50,7 +76,7 @@ function App() {
                 Profile
               </button>
               <button
-                onClick={() => signOut()}
+                onClick={handleSignOut}
                 className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
                 disabled={isLoading}
               >

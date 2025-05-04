@@ -13,6 +13,8 @@ interface RoomMembersProps {
 }
 
 export default function RoomMembers({ users, isOwner, onKickUser, onClose }: RoomMembersProps) {
+  const ownerUser = users[0]; // First user is always the owner
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
@@ -36,12 +38,12 @@ export default function RoomMembers({ users, isOwner, onKickUser, onClose }: Roo
             className="flex items-center justify-between p-3 bg-gray-700/30 rounded-xl"
           >
             <div className="flex items-center gap-2">
-              {isOwner && user.user_id === users[0]?.user_id && (
+              {user.user_id === ownerUser?.user_id && (
                 <Crown className="w-5 h-5 text-yellow-500" />
               )}
               <span>{user.user_email}</span>
             </div>
-            {isOwner && user.user_id !== users[0]?.user_id && (
+            {isOwner && user.user_id !== ownerUser?.user_id && (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

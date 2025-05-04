@@ -161,9 +161,9 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
         .select('*')
         .eq('room_id', selectedRoom.id)
         .eq('user_id', session.user.id)
-        .single();
+        .maybeSingle();
 
-      if (membershipError && membershipError.code !== 'PGRST116') {
+      if (membershipError) {
         throw membershipError;
       }
 

@@ -63,12 +63,17 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
         return;
       }
 
+      // Sort users so owner is always first
       const users = roomUsersData.map(roomUser => {
         const user = userData?.find(u => u.id === roomUser.user_id);
         return {
           user_id: roomUser.user_id,
           user_email: user?.email || 'Unknown User'
         };
+      }).sort((a, b) => {
+        if (a.user_id === roomData?.owner_id) return -1;
+        if (b.user_id === roomData?.owner_id) return 1;
+        return 0;
       });
 
       setRoomUsers(users);
@@ -101,13 +106,24 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
     if (!isOwner) return;
 
     try {
-      const { error } = await supabase
+      // First delete their study timer to ensure clean removal
+      const { error: timerError } = await supabase
+        .from('study_timers')
+        .delete()
+        .eq('room_id', roomId)
+        .eq('user_id', userId);
+
+      if (timerError) throw timerError;
+
+      // Then remove them from room_users
+      const { error: kickError } = await supabase
         .from('room_users')
         .delete()
         .eq('room_id', roomId)
         .eq('user_id', userId);
 
-      if (error) throw error;
+      if (kickError) throw kickError;
+
       toast.success('User removed from room');
     } catch (error) {
       if (error instanceof Error) {
