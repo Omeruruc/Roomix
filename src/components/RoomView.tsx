@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { MessageSquare } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { MessageSquare, Users } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import StudyTimer from './StudyTimer';
 import Chat from './Chat';
+import RoomMembers from './RoomMembers';
 
 interface RoomViewProps {
   session: Session;
@@ -18,10 +20,24 @@ interface RoomUser {
 
 export default function RoomView({ session, roomId }: RoomViewProps) {
   const [showChat, setShowChat] = useState(false);
+  const [showMembers, setShowMembers] = useState(false);
   const [roomUsers, setRoomUsers] = useState<RoomUser[]>([]);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
-    const fetchRoomUsers = async () => {
+    const fetchRoomDetails = async () => {
+      // Check if user is room owner
+      const { data: roomData } = await supabase
+        .from('rooms')
+        .select('owner_id')
+        .eq('id', roomId)
+        .single();
+
+      if (roomData) {
+        setIsOwner(roomData.owner_id === session.user.id);
+      }
+
+      // Fetch room users
       const { data: roomUsersData, error: roomUsersError } = await supabase
         .from('room_users')
         .select('user_id')
@@ -58,7 +74,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
       setRoomUsers(users);
     };
 
-    fetchRoomUsers();
+    fetchRoomDetails();
 
     const channel = supabase
       .channel(`room_users:${roomId}`)
@@ -71,7 +87,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
           filter: `room_id=eq.${roomId}`
         },
         () => {
-          fetchRoomUsers();
+          fetchRoomDetails();
         }
       )
       .subscribe();
@@ -79,11 +95,39 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
     return () => {
       channel.unsubscribe();
     };
-  }, [roomId]);
+  }, [roomId, session.user.id]);
+
+  const handleKickUser = async (userId: string) => {
+    if (!isOwner) return;
+
+    try {
+      const { error } = await supabase
+        .from('room_users')
+        .delete()
+        .eq('room_id', roomId)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      toast.success('User removed from room');
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      }
+    }
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <div className="mb-6 flex justify-end">
+      <div className="mb-6 flex justify-end gap-2">
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowMembers(!showMembers)}
+          className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl text-white font-semibold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-200 flex items-center gap-2"
+        >
+          <Users className="w-5 h-5" />
+          Room Members
+        </motion.button>
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -94,6 +138,17 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
           {showChat ? 'Show Timers' : 'Open Chat'}
         </motion.button>
       </div>
+
+      <AnimatePresence mode="wait">
+        {showMembers && (
+          <RoomMembers
+            users={roomUsers}
+            isOwner={isOwner}
+            onKickUser={handleKickUser}
+            onClose={() => setShowMembers(false)}
+          />
+        )}
+      </AnimatePresence>
 
       <div className={showChat ? 'hidden' : ''}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
