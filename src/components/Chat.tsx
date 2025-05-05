@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface Message {
   id: string;
@@ -23,6 +24,7 @@ interface ChatProps {
 }
 
 export default function Chat({ session, roomId }: ChatProps) {
+  const { theme } = useTheme();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -180,18 +182,26 @@ export default function Chat({ session, roomId }: ChatProps) {
   return (
     <div className="max-w-4xl mx-auto">
       <div 
-        className={`bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-lg rounded-2xl shadow-2xl border ${
-          isDragging ? 'border-blue-500 border-2' : 'border-gray-700/50'
-        } h-[600px] flex flex-col relative transition-all duration-300`}
+        className={`${
+          theme === 'dark'
+            ? 'bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-gray-700/50'
+            : 'bg-white/80 border-gray-200'
+        } backdrop-blur-lg rounded-2xl shadow-2xl border h-[600px] flex flex-col relative transition-all duration-300 ${
+          isDragging ? 'border-blue-500 border-2' : ''
+        }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
         {isDragging && (
           <div className="absolute inset-0 bg-blue-500/10 rounded-2xl flex items-center justify-center backdrop-blur-sm z-50">
-            <div className="bg-gray-800 p-4 rounded-lg shadow-xl flex items-center gap-2">
+            <div className={`${
+              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+            } p-4 rounded-lg shadow-xl flex items-center gap-2`}>
               <Paperclip className="w-6 h-6 text-blue-400" />
-              <p className="text-white font-medium">Drop your image here</p>
+              <p className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
+                Drop your image here
+              </p>
             </div>
           </div>
         )}
@@ -215,11 +225,17 @@ export default function Chat({ session, roomId }: ChatProps) {
                   whileHover={{ scale: 1.02 }}
                   className={`max-w-[70%] rounded-2xl p-4 ${
                     message.user_id === session.user.id
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                      : 'bg-gray-800/80 text-gray-100'
+                      ? theme === 'dark'
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
+                        : 'bg-blue-600 text-white'
+                      : theme === 'dark'
+                        ? 'bg-gray-800/80 text-gray-100'
+                        : 'bg-gray-100 text-gray-900'
                   }`}
                 >
-                  <p className="text-sm font-medium mb-1 opacity-80">{message.user_email}</p>
+                  <p className={`text-sm font-medium mb-1 ${
+                    theme === 'dark' ? 'opacity-80' : 'opacity-70'
+                  }`}>{message.user_email}</p>
                   {message.message_type === 'image' ? (
                     <motion.img 
                       initial={{ opacity: 0, scale: 0.8 }}
@@ -250,23 +266,33 @@ export default function Chat({ session, roomId }: ChatProps) {
                 <div className="relative">
                   <button
                     onClick={() => setShowEmojiPicker(false)}
-                    className="absolute -top-2 -right-2 p-1 bg-gray-700 rounded-full hover:bg-gray-600 transition-colors"
+                    className={`absolute -top-2 -right-2 p-1 ${
+                      theme === 'dark'
+                        ? 'bg-gray-700 hover:bg-gray-600'
+                        : 'bg-gray-200 hover:bg-gray-300'
+                    } rounded-full transition-colors`}
                   >
                     <X className="w-4 h-4" />
                   </button>
-                  <EmojiPicker onEmojiClick={onEmojiClick} />
+                  <EmojiPicker onEmojiClick={onEmojiClick} theme={theme} />
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-          <form onSubmit={handleSend} className="p-4 border-t border-gray-700/50">
+          <form onSubmit={handleSend} className={`p-4 border-t ${
+            theme === 'dark' ? 'border-gray-700/50' : 'border-gray-200'
+          }`}>
             <div className="flex gap-2">
               <motion.button
                 type="button"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                className="p-3 bg-gray-800 rounded-xl hover:bg-gray-700 transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10"
+                className={`p-3 ${
+                  theme === 'dark'
+                    ? 'bg-gray-800 hover:bg-gray-700'
+                    : 'bg-gray-100 hover:bg-gray-200'
+                } rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
               >
                 <Smile className="w-5 h-5" />
               </motion.button>
@@ -284,7 +310,11 @@ export default function Chat({ session, roomId }: ChatProps) {
                   disabled={isUploading}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
-                  className="p-3 bg-gray-800 rounded-xl hover:bg-gray-700 transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10"
+                  className={`p-3 ${
+                    theme === 'dark'
+                      ? 'bg-gray-800 hover:bg-gray-700'
+                      : 'bg-gray-100 hover:bg-gray-200'
+                  } rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
                 >
                   {isUploading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -298,13 +328,21 @@ export default function Chat({ session, roomId }: ChatProps) {
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Type a message..."
-                className="flex-1 px-4 py-2 bg-gray-800 rounded-xl border border-gray-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                className={`flex-1 px-4 py-2 ${
+                  theme === 'dark'
+                    ? 'bg-gray-800 border-gray-700'
+                    : 'bg-gray-100 border-gray-200'
+                } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
               />
               <motion.button
                 type="submit"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl text-white font-semibold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-200 flex items-center gap-2"
+                className={`px-6 py-2 ${
+                  theme === 'dark'
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
+                    : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
+                } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
               >
                 <Send className="w-5 h-5" />
               </motion.button>

@@ -3,6 +3,7 @@ import { Play, Pause, RotateCcw, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface StudyTimerProps {
   userId: string;
@@ -18,6 +19,7 @@ interface TimerState {
 }
 
 export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = false }: StudyTimerProps) {
+  const { theme } = useTheme();
   const [timerState, setTimerState] = useState<TimerState>({
     isRunning: false,
     time: 0,
@@ -132,7 +134,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
                 room_id: roomId,
                 elapsed_time: localTimeRef.current,
                 is_running: true,
-                subject: timerState.subject
+                subject: timerState.subject || subject
               });
 
             if (error) {
@@ -152,7 +154,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
         clearInterval(timerRef.current);
       }
     };
-  }, [timerState.isRunning, userId, roomId, isCurrentUser, timerState.subject]);
+  }, [timerState.isRunning, userId, roomId, isCurrentUser, timerState.subject, subject]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -164,7 +166,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
   const handleStartStop = async () => {
     if (!isCurrentUser) return;
 
-    if (!timerState.isRunning && !subject.trim()) {
+    if (!timerState.isRunning && !subject.trim() && !timerState.subject) {
       toast.error('Please enter a subject before starting the timer');
       return;
     }
@@ -229,11 +231,19 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
-        className="bg-gray-800/50 p-6 rounded-xl border border-gray-700/50 backdrop-blur-sm"
+        className={`${
+          theme === 'dark'
+            ? 'bg-gray-800/50 border-gray-700/50'
+            : 'bg-white/80 border-gray-200'
+        } p-6 rounded-xl border backdrop-blur-sm`}
       >
         <div className="flex items-center gap-3 mb-4">
-          <Clock className="w-6 h-6 text-blue-400" />
-          <h3 className="text-lg font-semibold">{userEmail}'s Study Timer</h3>
+          <Clock className={`w-6 h-6 ${
+            theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+          }`} />
+          <h3 className={`text-lg font-semibold ${
+            theme === 'dark' ? 'text-white' : 'text-gray-900'
+          }`}>{userEmail}'s Study Timer</h3>
         </div>
 
         <div className="space-y-4">
@@ -244,19 +254,27 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
                 value={subject || timerState.subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="Enter subject..."
-                className="flex-1 px-4 py-2 bg-gray-700/50 rounded-xl border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                className={`flex-1 px-4 py-2 ${
+                  theme === 'dark'
+                    ? 'bg-gray-700/50 border-gray-600 placeholder-gray-400'
+                    : 'bg-gray-100 border-gray-200 placeholder-gray-500'
+                } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
                 disabled={timerState.isRunning}
               />
             </div>
           ) : (
             timerState.subject && (
-              <p className="text-center text-gray-400">
+              <p className={`text-center ${
+                theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+              }`}>
                 Studying: {timerState.subject}
               </p>
             )
           )}
 
-          <div className="text-4xl font-bold text-center font-mono">
+          <div className={`text-4xl font-bold text-center font-mono ${
+            theme === 'dark' ? 'text-white' : 'text-gray-900'
+          }`}>
             {formatTime(timerState.time)}
           </div>
 
@@ -266,11 +284,15 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleStartStop}
-                className={`px-6 py-2 rounded-xl font-semibold shadow-lg transition-all duration-200 flex items-center gap-2
-                  ${timerState.isRunning
-                    ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-red-500/30'
-                    : 'bg-green-500/20 text-green-400 hover:bg-green-500/30 shadow-green-500/30'
-                  }`}
+                className={`px-6 py-2 rounded-xl font-semibold shadow-lg transition-all duration-200 flex items-center gap-2 ${
+                  timerState.isRunning
+                    ? theme === 'dark'
+                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-red-500/30'
+                      : 'bg-red-100 text-red-600 hover:bg-red-200 shadow-red-500/20'
+                    : theme === 'dark'
+                      ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 shadow-green-500/30'
+                      : 'bg-green-100 text-green-600 hover:bg-green-200 shadow-green-500/20'
+                }`}
               >
                 {timerState.isRunning ? (
                   <>
@@ -289,7 +311,11 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleReset}
-                className="px-6 py-2 bg-gray-700/50 hover:bg-gray-700 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2"
+                className={`px-6 py-2 ${
+                  theme === 'dark'
+                    ? 'bg-gray-700/50 hover:bg-gray-700'
+                    : 'bg-gray-200 hover:bg-gray-300'
+                } rounded-xl font-semibold transition-all duration-200 flex items-center gap-2`}
               >
                 <RotateCcw className="w-5 h-5" />
                 Reset

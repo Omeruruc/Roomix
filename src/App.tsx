@@ -6,17 +6,19 @@ import RoomView from './components/RoomView';
 import RoomList from './components/RoomList';
 import ProfileSettings from './components/ProfileSettings';
 import LandingPage from './components/LandingPage';
+import ThemeToggle from './components/ThemeToggle';
 import { useAuth } from './hooks/useAuth';
+import { useTheme } from './contexts/ThemeContext';
 import { supabase } from './lib/supabase';
 
 function App() {
   const { session, signOut } = useAuth();
+  const { theme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
 
-  // Effect to handle room cleanup on sign out
   useEffect(() => {
     if (!session && selectedRoomId) {
       setSelectedRoomId(null);
@@ -25,7 +27,6 @@ function App() {
 
   const handleSignOut = async () => {
     try {
-      // Remove user from all rooms before signing out
       if (session) {
         await supabase
           .from('room_users')
@@ -33,7 +34,6 @@ function App() {
           .eq('user_id', session.user.id);
       }
       
-      // Then sign out
       await signOut();
       setSelectedRoomId(null);
     } catch (error) {
@@ -50,34 +50,55 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white">
+    <div className={`min-h-screen ${theme === 'dark' ? 'bg-gradient-to-br from-gray-900 to-gray-800 text-white' : 'bg-gradient-to-br from-blue-50 to-white text-gray-900'}`}>
       <Toaster position="top-center" />
       {session && (
         <div className="container mx-auto px-4 py-8">
           <header className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-2">
-              <MessageCircle className="w-8 h-8 text-blue-400" />
+              <MessageCircle className={`w-8 h-8 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
               <h1 className="text-2xl font-bold">Study Room</h1>
             </div>
             <div className="flex items-center gap-4">
+              <ThemeToggle />
               {selectedRoomId && (
                 <button
-                  onClick={() => setSelectedRoomId(null)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+                  onClick={async () => {
+                    try {
+                      await supabase
+                        .from('room_users')
+                        .delete()
+                        .eq('user_id', session.user.id)
+                        .eq('room_id', selectedRoomId);
+
+                      setSelectedRoomId(null);
+                    } catch (error) {
+                      console.error('Error leaving room:', error);
+                    }
+                  }}
+                  className={`px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 hover:bg-gray-600'
+                      : 'bg-gray-200 hover:bg-gray-300'
+                  } rounded-lg transition-colors`}
                 >
                   Leave Room
                 </button>
               )}
               <button
                 onClick={() => setShowProfileSettings(true)}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors flex items-center gap-2"
+                className={`px-4 py-2 ${
+                  theme === 'dark'
+                    ? 'bg-gray-700 hover:bg-gray-600'
+                    : 'bg-gray-200 hover:bg-gray-300'
+                } rounded-lg transition-colors flex items-center gap-2`}
               >
                 <UserCircle className="w-5 h-5" />
                 Profile
               </button>
               <button
                 onClick={handleSignOut}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors text-white"
                 disabled={isLoading}
               >
                 Sign Out

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import RoomSettings from './RoomSettings';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface Room {
   id: string;
@@ -22,6 +23,7 @@ interface RoomListProps {
 }
 
 export default function RoomList({ session, onRoomSelect }: RoomListProps) {
+  const { theme } = useTheme();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -149,13 +151,11 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
     }
 
     try {
-      // First, verify the password matches
       if (joinPassword !== selectedRoom.password_hash) {
         toast.error('Incorrect password');
         return;
       }
 
-      // Only proceed with joining if password is correct
       const { data: existingMembership, error: membershipError } = await supabase
         .from('room_users')
         .select('*')
@@ -174,7 +174,6 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
         return;
       }
 
-      // Check current number of users
       const { count, error: countError } = await supabase
         .from('room_users')
         .select('*', { count: 'exact' })
@@ -189,7 +188,6 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
         return;
       }
 
-      // Join the room
       const { error: joinError } = await supabase
         .from('room_users')
         .insert([
@@ -214,16 +212,28 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-lg rounded-2xl shadow-2xl border border-gray-700/50 p-6">
+      <div className={`${
+        theme === 'dark' 
+          ? 'bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-gray-700/50' 
+          : 'bg-white/80 border-gray-200'
+        } backdrop-blur-lg rounded-2xl shadow-2xl border p-6`}>
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
+          <h2 className={`text-2xl font-bold ${
+            theme === 'dark'
+              ? 'bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text'
+              : 'text-blue-600'
+          }`}>
             Chat Rooms
           </h2>
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl text-white font-semibold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-200 flex items-center gap-2"
+            className={`px-4 py-2 ${
+              theme === 'dark'
+                ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
+                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
+            } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
           >
             <Plus className="w-5 h-5" />
             Create Room
@@ -231,13 +241,19 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
         </div>
 
         <div className="mb-6 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${
+            theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+          } w-5 h-5`} />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search rooms by name or ID..."
-            className="w-full pl-12 pr-4 py-3 bg-gray-700/50 rounded-xl border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+            className={`w-full pl-12 pr-4 py-3 ${
+              theme === 'dark'
+                ? 'bg-gray-700/50 border-gray-600 placeholder-gray-400'
+                : 'bg-gray-100 border-gray-200 placeholder-gray-500'
+            } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
           />
         </div>
 
@@ -247,24 +263,40 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
               key={room.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`bg-gray-800/50 p-4 rounded-xl border transition-all duration-200 ${
+              className={`${
+                theme === 'dark'
+                  ? 'bg-gray-800/50 border-gray-700/50 hover:border-blue-500/50'
+                  : 'bg-white border-gray-200 hover:border-blue-500/30'
+              } p-4 rounded-xl border transition-all duration-200 ${
                 room.owner_id === session.user.id
-                  ? 'border-blue-500/50 hover:border-blue-500'
-                  : 'border-gray-700/50 hover:border-blue-500/50'
+                  ? theme === 'dark' 
+                    ? 'border-blue-500/50 hover:border-blue-500'
+                    : 'border-blue-400/50 hover:border-blue-400'
+                  : ''
               }`}
             >
               <div className="flex justify-between items-center">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-white">{room.name}</h3>
+                    <h3 className={`text-lg font-semibold ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-900'
+                    }`}>{room.name}</h3>
                     {room.owner_id === session.user.id && (
-                      <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full">
+                      <span className={`px-2 py-1 ${
+                        theme === 'dark'
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-blue-100 text-blue-600'
+                      } text-xs rounded-full`}>
                         Owner
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-400">Created by {room.owner_email}</p>
-                  <p className="text-xs text-gray-500 mt-1">Room ID: {room.id}</p>
+                  <p className={`text-sm ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                  }`}>Created by {room.owner_email}</p>
+                  <p className={`text-xs ${
+                    theme === 'dark' ? 'text-gray-500' : 'text-gray-400'
+                  } mt-1`}>Room ID: {room.id}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {room.owner_id === session.user.id && (
@@ -275,7 +307,11 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                         setSelectedRoom(room);
                         setShowSettings(true);
                       }}
-                      className="p-2 bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors"
+                      className={`p-2 ${
+                        theme === 'dark'
+                          ? 'bg-gray-700/50 hover:bg-gray-700'
+                          : 'bg-gray-100 hover:bg-gray-200'
+                      } rounded-lg transition-colors`}
                     >
                       <Settings className="w-5 h-5" />
                     </motion.button>
@@ -287,7 +323,11 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                       setSelectedRoom(room);
                       setShowJoinModal(true);
                     }}
-                    className="px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-xl text-blue-400 font-medium transition-all duration-200 flex items-center gap-2"
+                    className={`px-4 py-2 ${
+                      theme === 'dark'
+                        ? 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-400'
+                        : 'bg-blue-100 hover:bg-blue-200 text-blue-600'
+                    } rounded-xl font-medium transition-all duration-200 flex items-center gap-2`}
                   >
                     <Lock className="w-4 h-4" />
                     Join Room
@@ -305,36 +345,54 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-gray-800 rounded-2xl p-6 max-w-md w-full"
+            className={`${
+              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+            } rounded-2xl p-6 max-w-md w-full`}
           >
-            <h3 className="text-xl font-bold mb-4">Create New Room</h3>
+            <h3 className={`text-xl font-bold mb-4 ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>Create New Room</h3>
             <form onSubmit={createRoom} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                } mb-1`}>
                   Room Name
                 </label>
                 <input
                   type="text"
                   value={newRoomName}
                   onChange={(e) => setNewRoomName(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-700 rounded-xl border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                  className={`w-full px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600'
+                      : 'bg-gray-50 border-gray-200'
+                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                } mb-1`}>
                   Room Password
                 </label>
                 <input
                   type="password"
                   value={newRoomPassword}
                   onChange={(e) => setNewRoomPassword(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-700 rounded-xl border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                  className={`w-full px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600'
+                      : 'bg-gray-50 border-gray-200'
+                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                } mb-1`}>
                   Maximum Users (1-100)
                 </label>
                 <input
@@ -343,7 +401,11 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                   max="100"
                   value={maxUsers}
                   onChange={(e) => setMaxUsers(parseInt(e.target.value))}
-                  className="w-full px-4 py-2 bg-gray-700 rounded-xl border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                  className={`w-full px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600'
+                      : 'bg-gray-50 border-gray-200'
+                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
                   required
                 />
               </div>
@@ -351,13 +413,21 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors"
+                  className={`px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 hover:bg-gray-600'
+                      : 'bg-gray-200 hover:bg-gray-300'
+                  } rounded-xl transition-colors`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl text-white font-semibold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-200"
+                  className={`px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
+                      : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
+                  } rounded-xl text-white font-semibold shadow-lg transition-all duration-200`}
                 >
                   Create Room
                 </button>
@@ -373,19 +443,29 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-gray-800 rounded-2xl p-6 max-w-md w-full"
+            className={`${
+              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+            } rounded-2xl p-6 max-w-md w-full`}
           >
-            <h3 className="text-xl font-bold mb-4">Join {selectedRoom.name}</h3>
+            <h3 className={`text-xl font-bold mb-4 ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>Join {selectedRoom.name}</h3>
             <form onSubmit={joinRoom} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                } mb-1`}>
                   Room Password
                 </label>
                 <input
                   type="password"
                   value={joinPassword}
                   onChange={(e) => setJoinPassword(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-700 rounded-xl border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                  className={`w-full px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600'
+                      : 'bg-gray-50 border-gray-200'
+                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
                   required
                 />
               </div>
@@ -397,13 +477,21 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                     setSelectedRoom(null);
                     setJoinPassword('');
                   }}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors"
+                  className={`px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 hover:bg-gray-600'
+                      : 'bg-gray-200 hover:bg-gray-300'
+                  } rounded-xl transition-colors`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl text-white font-semibold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-200 flex items-center gap-2"
+                  className={`px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
+                      : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
+                  } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
                 >
                   <LogIn className="w-5 h-5" />
                   Join Room

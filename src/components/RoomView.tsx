@@ -106,16 +106,6 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
     if (!isOwner) return;
 
     try {
-      // First delete their study timer to ensure clean removal
-      const { error: timerError } = await supabase
-        .from('study_timers')
-        .delete()
-        .eq('room_id', roomId)
-        .eq('user_id', userId);
-
-      if (timerError) throw timerError;
-
-      // Then remove them from room_users
       const { error: kickError } = await supabase
         .from('room_users')
         .delete()
