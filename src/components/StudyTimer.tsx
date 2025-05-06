@@ -61,24 +61,29 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
 
     // Subscribe to real-time changes for timer updates
     const timerChannel = supabase
-      .channel(`timer:${roomId}:${userId}`)
+      .channel(`study_timers:${roomId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'study_timers',
-          filter: `user_id=eq.${userId} AND room_id=eq.${roomId}`
+          filter: `room_id=eq.${roomId}`
         },
         (payload) => {
-          if (payload.new) {
-            const newData = payload.new;
+          if (payload.new && 'user_id' in payload.new && payload.new.user_id === userId) {
+            const newData = payload.new as { 
+              is_running: boolean; 
+              elapsed_time: number; 
+              subject?: string 
+            };
+            
             setTimerState({
-              isRunning: newData.is_running,
-              time: newData.elapsed_time,
-              subject: newData.subject || ''
+              isRunning: Boolean(newData.is_running),
+              time: Number(newData.elapsed_time) || 0,
+              subject: String(newData.subject || '')
             });
-            localTimeRef.current = newData.elapsed_time;
+            localTimeRef.current = Number(newData.elapsed_time) || 0;
             lastUpdateRef.current = Date.now();
           }
         }
@@ -134,7 +139,8 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
                 room_id: roomId,
                 elapsed_time: localTimeRef.current,
                 is_running: true,
-                subject: timerState.subject || subject
+                subject: timerState.subject || subject,
+                updated_at: new Date().toISOString()
               }, {
                 onConflict: 'user_id,room_id'
               });
@@ -183,7 +189,8 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
           room_id: roomId,
           elapsed_time: localTimeRef.current,
           is_running: newIsRunning,
-          subject: subject || timerState.subject
+          subject: subject || timerState.subject,
+          updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id,room_id'
         });
@@ -215,7 +222,8 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
           room_id: roomId,
           elapsed_time: 0,
           is_running: false,
-          subject: subject || timerState.subject
+          subject: subject || timerState.subject,
+          updated_at: new Date().toISOString()
         }, {
           onConflict: 'user_id,room_id'
         });
