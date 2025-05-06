@@ -61,24 +61,24 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
 
     // Subscribe to real-time changes for timer updates
     const timerChannel = supabase
-      .channel(`study_timers:${roomId}`)
+      .channel(`timer:${roomId}:${userId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'study_timers',
-          filter: `room_id=eq.${roomId}`
+          filter: `user_id=eq.${userId} AND room_id=eq.${roomId}`
         },
         (payload) => {
-          if (payload.new && 'user_id' in payload.new && payload.new.user_id === userId) {
+          if (payload.new) {
             const newData = payload.new;
             setTimerState({
-              isRunning: 'is_running' in newData ? newData.is_running : false,
-              time: 'elapsed_time' in newData ? newData.elapsed_time : 0,
-              subject: (newData as { subject?: string }).subject || ''
+              isRunning: newData.is_running,
+              time: newData.elapsed_time,
+              subject: newData.subject || ''
             });
-            localTimeRef.current = (newData as { elapsed_time: number }).elapsed_time;
+            localTimeRef.current = newData.elapsed_time;
             lastUpdateRef.current = Date.now();
           }
         }
@@ -117,16 +117,16 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
     }
 
     if (timerState.isRunning) {
-      timerRef.current = setInterval(() => {
+      timerRef.current = setInterval(async () => {
         localTimeRef.current += 1;
         setTimerState(prev => ({
           ...prev,
           time: localTimeRef.current
         }));
 
-        // Update server every 5 seconds if this is the current user's timer
-        if (isCurrentUser && Date.now() - lastUpdateRef.current >= 5000) {
-          const updateServerState = async () => {
+        // Update server every second if this is the current user's timer
+        if (isCurrentUser && Date.now() - lastUpdateRef.current >= 1000) {
+          try {
             const { error } = await supabase
               .from('study_timers')
               .upsert({
@@ -135,6 +135,8 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
                 elapsed_time: localTimeRef.current,
                 is_running: true,
                 subject: timerState.subject || subject
+              }, {
+                onConflict: 'user_id,room_id'
               });
 
             if (error) {
@@ -142,9 +144,9 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
             } else {
               lastUpdateRef.current = Date.now();
             }
-          };
-
-          updateServerState();
+          } catch (error) {
+            console.error('Error updating timer:', error);
+          }
         }
       }, 1000);
     }
@@ -173,56 +175,66 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
 
     const newIsRunning = !timerState.isRunning;
     
-    const { error } = await supabase
-      .from('study_timers')
-      .upsert({
-        user_id: userId,
-        room_id: roomId,
-        elapsed_time: localTimeRef.current,
-        is_running: newIsRunning,
-        subject: subject || timerState.subject,
-        updated_at: new Date().toISOString()
-      });
+    try {
+      const { error } = await supabase
+        .from('study_timers')
+        .upsert({
+          user_id: userId,
+          room_id: roomId,
+          elapsed_time: localTimeRef.current,
+          is_running: newIsRunning,
+          subject: subject || timerState.subject
+        }, {
+          onConflict: 'user_id,room_id'
+        });
 
-    if (error) {
-      toast.error('Failed to update timer state');
-      return;
+      if (error) throw error;
+
+      setTimerState(prev => ({
+        ...prev,
+        isRunning: newIsRunning,
+        subject: subject || prev.subject
+      }));
+      lastUpdateRef.current = Date.now();
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error('Failed to update timer state');
+        console.error('Error updating timer:', error);
+      }
     }
-
-    setTimerState(prev => ({
-      ...prev,
-      isRunning: newIsRunning,
-      subject: subject || prev.subject
-    }));
-    lastUpdateRef.current = Date.now();
   };
 
   const handleReset = async () => {
     if (!isCurrentUser) return;
 
-    const { error } = await supabase
-      .from('study_timers')
-      .upsert({
-        user_id: userId,
-        room_id: roomId,
-        elapsed_time: 0,
-        is_running: false,
-        subject: subject || timerState.subject,
-        updated_at: new Date().toISOString()
-      });
+    try {
+      const { error } = await supabase
+        .from('study_timers')
+        .upsert({
+          user_id: userId,
+          room_id: roomId,
+          elapsed_time: 0,
+          is_running: false,
+          subject: subject || timerState.subject
+        }, {
+          onConflict: 'user_id,room_id'
+        });
 
-    if (error) {
-      toast.error('Failed to reset timer');
-      return;
+      if (error) throw error;
+
+      localTimeRef.current = 0;
+      setTimerState(prev => ({
+        ...prev,
+        time: 0,
+        isRunning: false
+      }));
+      lastUpdateRef.current = Date.now();
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error('Failed to reset timer');
+        console.error('Error resetting timer:', error);
+      }
     }
-
-    localTimeRef.current = 0;
-    setTimerState(prev => ({
-      ...prev,
-      time: 0,
-      isRunning: false
-    }));
-    lastUpdateRef.current = Date.now();
   };
 
   if (!isVisible) return null;
