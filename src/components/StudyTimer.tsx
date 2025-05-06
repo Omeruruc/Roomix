@@ -71,14 +71,14 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
           filter: `room_id=eq.${roomId}`
         },
         (payload) => {
-          if (payload.new && payload.new.user_id === userId) {
+          if (payload.new && 'user_id' in payload.new && payload.new.user_id === userId) {
             const newData = payload.new;
             setTimerState({
-              isRunning: newData.is_running,
-              time: newData.elapsed_time,
-              subject: newData.subject || ''
+              isRunning: 'is_running' in newData ? newData.is_running : false,
+              time: 'elapsed_time' in newData ? newData.elapsed_time : 0,
+              subject: (newData as { subject?: string }).subject || ''
             });
-            localTimeRef.current = newData.elapsed_time;
+            localTimeRef.current = (newData as { elapsed_time: number }).elapsed_time;
             lastUpdateRef.current = Date.now();
           }
         }

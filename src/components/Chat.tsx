@@ -235,7 +235,15 @@ export default function Chat({ session, roomId }: ChatProps) {
                 >
                   <p className={`text-sm font-medium mb-1 ${
                     theme === 'dark' ? 'opacity-80' : 'opacity-70'
-                  }`}>{message.user_email}</p>
+                  }`}>
+                    {message.user_email} 
+                    <span className="ml-2 text-xs opacity-70">
+                      {new Date(message.created_at).toLocaleTimeString('tr-TR', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </span>
+                  </p>
                   {message.message_type === 'image' ? (
                     <motion.img 
                       initial={{ opacity: 0, scale: 0.8 }}
@@ -274,7 +282,7 @@ export default function Chat({ session, roomId }: ChatProps) {
                   >
                     <X className="w-4 h-4" />
                   </button>
-                  <EmojiPicker onEmojiClick={onEmojiClick} theme={theme} />
+                  <EmojiPicker onEmojiClick={onEmojiClick} theme={theme === 'dark' ? 'dark' : 'light' as any} />
                 </div>
               </motion.div>
             )}
