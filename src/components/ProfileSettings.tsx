@@ -17,6 +17,8 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isAvatarUploading, setIsAvatarUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -44,7 +46,6 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
   }, []);
 
   const validateEmail = (email: string) => {
-    // More strict email validation that matches Supabase's requirements
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     return emailRegex.test(email);
   };
@@ -63,20 +64,27 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
 
     setIsUpdating(true);
     try {
-      // Önce kimlik doğrulama için oturum açma girişiminde bulunuyoruz
-      const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({
-        email: (await supabase.auth.getUser()).data.user?.email || '',
+      // Kullanıcının mevcut e-posta adresini al
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !user.email) {
+        throw new Error('Kullanıcı bilgisi alınamadı');
+      }
+      
+      // Önce oturum açarak kimlik doğrulaması yap
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
         password: currentPassword,
       });
       
       if (signInError) {
         toast.error('Geçersiz şifre. Lütfen şifrenizi kontrol edin.');
-        setIsUpdating(false);
         return;
       }
       
-      // Şifre doğruysa e-posta adresini güncelle
-      const { error } = await supabase.auth.updateUser({ email: newEmail });
+      // E-posta adresini güncelle
+      const { error } = await supabase.auth.updateUser({ 
+        email: newEmail 
+      });
       
       if (error) {
         if (error.message.includes('email_address_invalid')) {
@@ -87,7 +95,7 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
         return;
       }
       
-      toast.success('E-posta güncelleme isteği gönderildi. Onay için yeni e-postanızı kontrol edin.');
+      toast.success('E-posta güncelleme isteği gönderildi. Onay için e-postanızı kontrol edin.');
       onClose();
     } catch (error) {
       if (error instanceof Error) {
@@ -107,20 +115,27 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
 
     setIsUpdating(true);
     try {
-      // Önce kimlik doğrulama için oturum açma girişiminde bulunuyoruz
-      const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({
-        email: (await supabase.auth.getUser()).data.user?.email || '',
+      // Kullanıcının mevcut e-posta adresini al
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !user.email) {
+        throw new Error('Kullanıcı bilgisi alınamadı');
+      }
+      
+      // Önce oturum açarak kimlik doğrulaması yap
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
         password: currentPassword,
       });
       
       if (signInError) {
         toast.error('Geçersiz şifre. Lütfen şifrenizi kontrol edin.');
-        setIsUpdating(false);
         return;
       }
       
-      // Şifre doğruysa yeni şifreyi ayarla
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      // Şifreyi güncelle
+      const { error } = await supabase.auth.updateUser({ 
+        password: newPassword 
+      });
       
       if (error) throw error;
       
@@ -135,12 +150,25 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
     }
   };
 
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     if (!file.type.startsWith('image/')) {
       toast.error('Lütfen bir resim dosyası yükleyin');
+      return;
+    }
+    
+    setSelectedFile(file);
+    
+    // Önizleme için dosyayı URL'e dönüştür
+    const fileUrl = URL.createObjectURL(file);
+    setPreviewUrl(fileUrl);
+  };
+
+  const handleAvatarUpload = async () => {
+    if (!selectedFile) {
+      toast.error('Lütfen önce bir fotoğraf seçin');
       return;
     }
     
@@ -151,14 +179,28 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
       if (!user) throw new Error('Kullanıcı bulunamadı');
       
       // Dosya uzantısını al
-      const fileExt = file.name.split('.').pop();
+      const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
       
-      // Storage'a yükle
+      // Önce storage bucket'ın var olduğundan emin ol
+      try {
+        await supabase.storage.getBucket('profiles');
+      } catch (error) {
+        // Bucket yoksa oluştur
+        await supabase.storage.createBucket('profiles', {
+          public: true,
+          fileSizeLimit: 5 * 1024 * 1024 // 5MB
+        });
+      }
+      
+      // Dosyayı storage'a yükle
       const { error: uploadError } = await supabase.storage
         .from('profiles')
-        .upload(filePath, file);
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: true
+        });
         
       if (uploadError) throw uploadError;
       
@@ -182,9 +224,13 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
       
       // State'i güncelle
       setAvatarUrl(publicUrl);
-      toast.success('Profil fotoğrafı güncellendi');
+      setSelectedFile(null);
+      setPreviewUrl(null);
+      
+      toast.success('Profil fotoğrafı başarıyla güncellendi');
       
     } catch (error) {
+      console.error('Profil fotoğrafı yükleme hatası:', error);
       if (error instanceof Error) {
         toast.error(`Profil fotoğrafı yüklenirken hata oluştu: ${error.message}`);
       }
@@ -222,13 +268,22 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
                 theme === 'dark' ? 'border-gray-700' : 'border-gray-300'
               }`}
             >
-              {avatarUrl ? (
+              {previewUrl ? (
+                // Önizleme fotoğrafı
+                <img 
+                  src={previewUrl} 
+                  alt="Preview" 
+                  className="w-full h-full object-cover"
+                />
+              ) : avatarUrl ? (
+                // Mevcut profil fotoğrafı
                 <img 
                   src={avatarUrl} 
                   alt="Profile" 
                   className="w-full h-full object-cover"
                 />
               ) : (
+                // Varsayılan avatar
                 <div className={`w-full h-full flex items-center justify-center ${
                   theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
                 }`}>
@@ -245,31 +300,53 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
               )}
             </div>
             
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleAvatarUpload}
-              accept="image/*"
-              className="hidden"
-            />
-            
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isAvatarUploading}
-              className={`px-4 py-2 ${
-                theme === 'dark'
-                  ? 'bg-gray-700 hover:bg-gray-600'
-                  : 'bg-gray-200 hover:bg-gray-300'
-              } rounded-xl transition-colors flex items-center gap-2 ${
-                isAvatarUploading ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
-            >
-              <Image className="w-5 h-5" />
-              {avatarUrl ? 'Fotoğrafı Değiştir' : 'Fotoğraf Yükle'}
-            </motion.button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                accept="image/*"
+                className="hidden"
+              />
+              
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isAvatarUploading}
+                className={`px-4 py-2 ${
+                  theme === 'dark'
+                    ? 'bg-gray-700 hover:bg-gray-600'
+                    : 'bg-gray-200 hover:bg-gray-300'
+                } rounded-xl transition-colors flex items-center gap-2 ${
+                  isAvatarUploading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <Image className="w-5 h-5" />
+                {avatarUrl ? 'Fotoğraf Seç' : 'Fotoğraf Seç'}
+              </motion.button>
+              
+              {selectedFile && (
+                <motion.button
+                  type="button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleAvatarUpload}
+                  disabled={isAvatarUploading}
+                  className={`px-4 py-2 bg-gradient-to-r from-green-500 to-teal-600 text-white rounded-xl transition-colors flex items-center gap-2 ${
+                    isAvatarUploading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isAvatarUploading ? (
+                    <Loader className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Save className="w-5 h-5" />
+                  )}
+                  Kaydet
+                </motion.button>
+              )}
+            </div>
           </div>
 
           {/* Email Update Form */}
