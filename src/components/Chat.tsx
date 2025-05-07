@@ -290,32 +290,11 @@ export default function Chat({ session, roomId }: ChatProps) {
           <form onSubmit={handleSend} className={`p-4 border-t ${
             theme === 'dark' ? 'border-gray-700/50' : 'border-gray-200'
           }`}>
-            <div className="flex gap-2">
-              <motion.button
-                type="button"
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className={`p-3 ${
-                  theme === 'dark'
-                    ? 'bg-gray-800 hover:bg-gray-700'
-                    : 'bg-gray-100 hover:bg-gray-200'
-                } rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
-              >
-                <Smile className="w-5 h-5" />
-              </motion.button>
-              <div className="relative">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
-                  accept="image/*"
-                  className="hidden"
-                />
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex gap-2">
                 <motion.button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
                   className={`p-3 ${
@@ -324,12 +303,35 @@ export default function Chat({ session, roomId }: ChatProps) {
                       : 'bg-gray-100 hover:bg-gray-200'
                   } rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
                 >
-                  {isUploading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <ImageIcon className="w-5 h-5" />
-                  )}
+                  <Smile className="w-5 h-5" />
                 </motion.button>
+                <div className="relative">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <motion.button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`p-3 ${
+                      theme === 'dark'
+                        ? 'bg-gray-800 hover:bg-gray-700'
+                        : 'bg-gray-100 hover:bg-gray-200'
+                    } rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
+                  >
+                    {isUploading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ImageIcon className="w-5 h-5" />
+                    )}
+                  </motion.button>
+                </div>
               </div>
               <input
                 type="text"

@@ -54,12 +54,12 @@ function App() {
       <Toaster position="top-center" />
       {session && (
         <div className="container mx-auto px-4 py-8">
-          <header className="flex items-center justify-between mb-8">
+          <header className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-2">
               <MessageCircle className={`w-8 h-8 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
               <h1 className="text-2xl font-bold">Study Room</h1>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center justify-center gap-4">
               <ThemeToggle />
               {selectedRoomId && (
                 <button
