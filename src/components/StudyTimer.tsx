@@ -31,6 +31,102 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
   const timerRef = useRef<NodeJS.Timeout>();
   const localTimeRef = useRef<number>(0);
 
+  // Tüm kronometreler için genel realtime dinleme kanalını oluşturan fonksiyon
+  const setupRealtimeSubscription = () => {
+    // Oda içindeki tüm timer değişikliklerini dinleyen kanal
+    const channel = supabase
+      .channel(`room_timers_general:${roomId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'study_timers',
+          filter: `room_id=eq.${roomId}` // Tüm oda kronometrelerini dinle
+        },
+        (payload) => {
+          // Değişiklik gerçekleşen kronometreyi kontrol et
+          if (payload.new && 'user_id' in payload.new && payload.new.user_id === userId) {
+            const newData = payload.new as { 
+              is_running: boolean; 
+              elapsed_time: number; 
+              subject?: string;
+              user_id: string;
+            };
+            
+            // Lokal state'i güncelleyerek sayfa yenileme olmadan anında göster
+            setTimerState({
+              isRunning: Boolean(newData.is_running),
+              time: Number(newData.elapsed_time) || 0,
+              subject: String(newData.subject || '')
+            });
+            
+            // LocalTime referansını güncelle
+            localTimeRef.current = Number(newData.elapsed_time) || 0;
+            lastUpdateRef.current = Date.now();
+            
+            // Kronometre durdurulduğunda ya da başlatıldığında interval'i düzenle
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+            }
+            
+            if (Boolean(newData.is_running)) {
+              startInterval();
+            }
+          }
+        }
+      )
+      .subscribe();
+      
+    return channel;
+  };
+  
+  // İnterval'i başlatan yardımcı fonksiyon
+  const startInterval = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    
+    timerRef.current = setInterval(() => {
+      localTimeRef.current += 1;
+      setTimerState(prev => ({
+        ...prev,
+        time: localTimeRef.current
+      }));
+      
+      // Server güncelleme işlemi aktif kullanıcı için
+      if (isCurrentUser && Date.now() - lastUpdateRef.current >= 1000) {
+        updateServerTimer(localTimeRef.current, true);
+      }
+    }, 1000);
+  };
+  
+  // Server'a timer durumunu güncelleyen fonksiyon
+  const updateServerTimer = async (elapsedTime: number, isRunning: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('study_timers')
+        .upsert({
+          user_id: userId,
+          room_id: roomId,
+          elapsed_time: elapsedTime,
+          is_running: isRunning,
+          subject: timerState.subject || subject,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id,room_id'
+        });
+
+      if (error) {
+        console.error('Timer güncellenirken hata oluştu:', error);
+      } else {
+        lastUpdateRef.current = Date.now();
+      }
+    } catch (error) {
+      console.error('Timer güncellenirken hata oluştu:', error);
+    }
+  };
+
   useEffect(() => {
     const loadTimerState = async () => {
       const { data, error } = await supabase
@@ -41,7 +137,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
         .maybeSingle();
 
       if (error) {
-        console.error('Failed to load timer state:', error);
+        console.error('Timer verisi alınırken hata oluştu:', error);
         return;
       }
 
@@ -54,43 +150,20 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
         localTimeRef.current = data.elapsed_time;
         setSubject(data.subject || '');
         lastUpdateRef.current = Date.now();
+        
+        // Timer çalışıyorsa interval'i başlat
+        if (data.is_running) {
+          startInterval();
+        }
       }
     };
 
     loadTimerState();
-
-    // Subscribe to real-time changes for timer updates - specifically using a more direct channel
-    const timerChannel = supabase
-      .channel(`study_timer:${roomId}:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'study_timers',
-          filter: `room_id=eq.${roomId} AND user_id=eq.${userId}`
-        },
-        (payload) => {
-          if (payload.new) {
-            const newData = payload.new as { 
-              is_running: boolean; 
-              elapsed_time: number; 
-              subject?: string 
-            };
-            
-            setTimerState({
-              isRunning: Boolean(newData.is_running),
-              time: Number(newData.elapsed_time) || 0,
-              subject: String(newData.subject || '')
-            });
-            localTimeRef.current = Number(newData.elapsed_time) || 0;
-            lastUpdateRef.current = Date.now();
-          }
-        }
-      )
-      .subscribe();
-
-    // Subscribe to room_users changes to handle user removal
+    
+    // Realtime dinleme kanalı oluştur
+    const roomTimersChannel = setupRealtimeSubscription();
+    
+    // Kullanıcının odadan ayrılması durumunu dinle
     const roomUsersChannel = supabase
       .channel(`room_users:${roomId}:${userId}`)
       .on(
@@ -108,68 +181,13 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
       .subscribe();
 
     return () => {
-      timerChannel.unsubscribe();
+      roomTimersChannel.unsubscribe();
       roomUsersChannel.unsubscribe();
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
     };
-  }, [userId, roomId]);
-
-  useEffect(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
-    if (timerState.isRunning) {
-      timerRef.current = setInterval(async () => {
-        localTimeRef.current += 1;
-        setTimerState(prev => ({
-          ...prev,
-          time: localTimeRef.current
-        }));
-
-        // Update server every second if this is the current user's timer
-        if (isCurrentUser && Date.now() - lastUpdateRef.current >= 1000) {
-          try {
-            const { error } = await supabase
-              .from('study_timers')
-              .upsert({
-                user_id: userId,
-                room_id: roomId,
-                elapsed_time: localTimeRef.current,
-                is_running: true,
-                subject: timerState.subject || subject,
-                updated_at: new Date().toISOString()
-              }, {
-                onConflict: 'user_id,room_id'
-              });
-
-            if (error) {
-              console.error('Failed to update server state:', error);
-            } else {
-              lastUpdateRef.current = Date.now();
-            }
-          } catch (error) {
-            console.error('Error updating timer:', error);
-          }
-        }
-      }, 1000);
-    }
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, [timerState.isRunning, userId, roomId, isCurrentUser, timerState.subject, subject]);
-
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
+  }, [userId, roomId, isCurrentUser]);
 
   const handleStartStop = async () => {
     if (!isCurrentUser) return;
@@ -182,28 +200,22 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
     const newIsRunning = !timerState.isRunning;
     
     try {
-      const { error } = await supabase
-        .from('study_timers')
-        .upsert({
-          user_id: userId,
-          room_id: roomId,
-          elapsed_time: localTimeRef.current,
-          is_running: newIsRunning,
-          subject: subject || timerState.subject,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,room_id'
-        });
-
-      if (error) throw error;
-
-      // Yerel durumu güncelle
+      // Server'a durumu güncelle
+      await updateServerTimer(localTimeRef.current, newIsRunning);
+      
+      // Yerel state'i güncelle
       setTimerState(prev => ({
         ...prev,
         isRunning: newIsRunning,
         subject: subject || prev.subject
       }));
-      lastUpdateRef.current = Date.now();
+      
+      // Interval'i duruma göre başlat veya durdur
+      if (newIsRunning) {
+        startInterval();
+      } else if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
     } catch (error) {
       if (error instanceof Error) {
         toast.error('Failed to update timer state');
@@ -216,29 +228,21 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
     if (!isCurrentUser) return;
 
     try {
-      const { error } = await supabase
-        .from('study_timers')
-        .upsert({
-          user_id: userId,
-          room_id: roomId,
-          elapsed_time: 0,
-          is_running: false,
-          subject: subject || timerState.subject,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id,room_id'
-        });
-
-      if (error) throw error;
-
-      // Yerel durumu güncelle
+      // Server'ı sıfırla
+      await updateServerTimer(0, false);
+      
+      // Yerel state'i sıfırla
       localTimeRef.current = 0;
       setTimerState(prev => ({
         ...prev,
         time: 0,
         isRunning: false
       }));
-      lastUpdateRef.current = Date.now();
+      
+      // Interval'i durdur
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
     } catch (error) {
       if (error instanceof Error) {
         toast.error('Failed to reset timer');
@@ -351,3 +355,10 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
     </AnimatePresence>
   );
 }
+
+const formatTime = (seconds: number) => {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
