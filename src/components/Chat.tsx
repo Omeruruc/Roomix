@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { Send, Smile, Image as ImageIcon, X, Loader2, Paperclip } from 'lucide-react';
+import { Send, Smile, Image as ImageIcon, X, Loader2, Paperclip, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,6 +16,7 @@ interface Message {
   image_url?: string;
   message_type: 'text' | 'image';
   room_id: string;
+  avatar_url?: string;
 }
 
 interface ChatProps {
@@ -44,18 +45,49 @@ export default function Chat({ session, roomId }: ChatProps) {
 
   useEffect(() => {
     const fetchMessages = async () => {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('room_id', roomId)
-        .order('created_at', { ascending: true });
+      try {
+        // Önce tüm mesajları getir
+        const { data: messagesData, error: messagesError } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('room_id', roomId)
+          .order('created_at', { ascending: true });
 
-      if (error) {
+        if (messagesError) {
+          toast.error('Failed to fetch messages');
+          return;
+        }
+
+        if (!messagesData || messagesData.length === 0) {
+          setMessages([]);
+          return;
+        }
+
+        // Mesajları atan her kullanıcının profil bilgilerini getir
+        const uniqueUserIds = [...new Set(messagesData.map(msg => msg.user_id))];
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, avatar_url')
+          .in('id', uniqueUserIds);
+
+        if (profilesError) {
+          console.error('Failed to fetch profile data:', profilesError);
+        }
+
+        // Mesajlara profil fotoğraflarını ekle
+        const messagesWithAvatars = messagesData.map(message => {
+          const userProfile = profilesData?.find(profile => profile.id === message.user_id);
+          return {
+            ...message,
+            avatar_url: userProfile?.avatar_url || null
+          };
+        });
+
+        setMessages(messagesWithAvatars);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
         toast.error('Failed to fetch messages');
-        return;
       }
-
-      setMessages(data || []);
     };
 
     fetchMessages();
@@ -70,9 +102,24 @@ export default function Chat({ session, roomId }: ChatProps) {
           table: 'messages',
           filter: `room_id=eq.${roomId}`
         },
-        (payload) => {
+        async (payload) => {
           if (payload.eventType === 'INSERT') {
-            setMessages((current) => [...current, payload.new as Message]);
+            const newMessage = payload.new as Message;
+            
+            // Yeni mesajın kullanıcısına ait profil bilgisini getir
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('avatar_url')
+              .eq('id', newMessage.user_id)
+              .single();
+              
+            // Avatar bilgisini ekle
+            const messageWithAvatar = {
+              ...newMessage,
+              avatar_url: profileData?.avatar_url || null
+            };
+            
+            setMessages((current) => [...current, messageWithAvatar]);
           }
         }
       )
@@ -221,6 +268,26 @@ export default function Chat({ session, roomId }: ChatProps) {
                   message.user_id === session.user.id ? 'justify-end' : 'justify-start'
                 }`}
               >
+                {message.user_id !== session.user.id && (
+                  <div className="flex-shrink-0 mr-2">
+                    {message.avatar_url ? (
+                      <div className="w-8 h-8 rounded-full overflow-hidden">
+                        <img
+                          src={message.avatar_url}
+                          alt={message.user_email}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                      }`}>
+                        <User className="w-4 h-4 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <motion.div
                   whileHover={{ scale: 1.02 }}
                   className={`max-w-[70%] rounded-2xl p-4 ${
@@ -244,6 +311,7 @@ export default function Chat({ session, roomId }: ChatProps) {
                       })}
                     </span>
                   </p>
+                  
                   {message.message_type === 'image' ? (
                     <motion.img 
                       initial={{ opacity: 0, scale: 0.8 }}
@@ -257,6 +325,26 @@ export default function Chat({ session, roomId }: ChatProps) {
                     <p className="break-words">{message.content}</p>
                   )}
                 </motion.div>
+                
+                {message.user_id === session.user.id && (
+                  <div className="flex-shrink-0 ml-2">
+                    {message.avatar_url ? (
+                      <div className="w-8 h-8 rounded-full overflow-hidden">
+                        <img
+                          src={message.avatar_url}
+                          alt={message.user_email}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                      }`}>
+                        <User className="w-4 h-4 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>
