@@ -59,19 +59,19 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
 
     loadTimerState();
 
-    // Subscribe to real-time changes for timer updates
+    // Subscribe to real-time changes for timer updates - specifically using a more direct channel
     const timerChannel = supabase
-      .channel(`study_timers:${roomId}`)
+      .channel(`study_timer:${roomId}:${userId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'study_timers',
-          filter: `room_id=eq.${roomId}`
+          filter: `room_id=eq.${roomId} AND user_id=eq.${userId}`
         },
         (payload) => {
-          if (payload.new && 'user_id' in payload.new && payload.new.user_id === userId) {
+          if (payload.new) {
             const newData = payload.new as { 
               is_running: boolean; 
               elapsed_time: number; 
@@ -197,6 +197,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
 
       if (error) throw error;
 
+      // Yerel durumu güncelle
       setTimerState(prev => ({
         ...prev,
         isRunning: newIsRunning,
@@ -230,6 +231,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
 
       if (error) throw error;
 
+      // Yerel durumu güncelle
       localTimeRef.current = 0;
       setTimerState(prev => ({
         ...prev,

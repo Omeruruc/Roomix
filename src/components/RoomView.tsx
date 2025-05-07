@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { MessageSquare, Users } from 'lucide-react';
+import { MessageSquare, Users, Trophy } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import StudyTimer from './StudyTimer';
 import Chat from './Chat';
 import RoomMembers from './RoomMembers';
+import Leaderboard from './Leaderboard';
 
 interface RoomViewProps {
   session: Session;
@@ -21,6 +22,7 @@ interface RoomUser {
 export default function RoomView({ session, roomId }: RoomViewProps) {
   const [showChat, setShowChat] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [roomUsers, setRoomUsers] = useState<RoomUser[]>([]);
   const [isOwner, setIsOwner] = useState(false);
 
@@ -65,7 +67,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
 
       // Sort users so owner is always first
       const users = roomUsersData.map(roomUser => {
-        const user = userData?.find(u => u.id === roomUser.user_id);
+        const user = userData?.find((u: { id: string }) => u.id === roomUser.user_id);
         return {
           user_id: roomUser.user_id,
           user_email: user?.email || 'Unknown User'
@@ -124,7 +126,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
 
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <div className="mb-6 flex justify-end gap-2">
+      <div className="mb-6 flex flex-wrap justify-end gap-2">
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
@@ -137,7 +139,22 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => setShowChat(!showChat)}
+          onClick={() => {
+            setShowLeaderboard(!showLeaderboard);
+            setShowChat(false);
+          }}
+          className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl text-white font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all duration-200 flex items-center gap-2"
+        >
+          <Trophy className="w-5 h-5" />
+          {showLeaderboard ? 'Show Timers' : 'Leader board'}
+        </motion.button>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            setShowChat(!showChat);
+            setShowLeaderboard(false);
+          }}
           className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl text-white font-semibold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-200 flex items-center gap-2"
         >
           <MessageSquare className="w-5 h-5" />
@@ -156,7 +173,9 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
         )}
       </AnimatePresence>
 
-      <div className={showChat ? 'hidden' : ''}>
+      {showLeaderboard && <Leaderboard roomId={roomId} />}
+
+      <div className={showChat || showLeaderboard ? 'hidden' : ''}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {roomUsers.map((user) => (
             <StudyTimer
