@@ -233,11 +233,11 @@ export default function Chat({ session, roomId }: ChatProps) {
                         : 'bg-gray-100 text-gray-900'
                   }`}
                 >
-                  <p className={`text-sm font-medium mb-1 ${
+                  <p className={`text-sm font-medium mb-1 flex flex-wrap items-center justify-between ${
                     theme === 'dark' ? 'opacity-80' : 'opacity-70'
                   }`}>
-                    {message.user_email}
-                    <span className="ml-2 text-xs opacity-70">
+                    <span className="truncate mr-2">{message.user_email}</span>
+                    <span className="text-xs opacity-70 whitespace-nowrap">
                       {new Date(message.created_at).toLocaleTimeString('tr-TR', { 
                         hour: '2-digit', 
                         minute: '2-digit' 
