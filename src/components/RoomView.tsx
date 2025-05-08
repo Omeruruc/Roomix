@@ -17,6 +17,7 @@ interface RoomViewProps {
 interface RoomUser {
   user_id: string;
   user_email: string;
+  avatar_url: string | null;
 }
 
 export default function RoomView({ session, roomId }: RoomViewProps) {
@@ -65,12 +66,21 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
         return;
       }
 
+      // Kullanıcıların profil fotoğraflarını getir
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, avatar_url')
+        .in('id', roomUsersData.map(u => u.user_id));
+
       // Sort users so owner is always first
       const users = roomUsersData.map(roomUser => {
         const user = userData?.find((u: { id: string }) => u.id === roomUser.user_id);
+        const profile = profilesData?.find(p => p.id === roomUser.user_id);
+        
         return {
           user_id: roomUser.user_id,
-          user_email: user?.email || 'Unknown User'
+          user_email: user?.email || 'Unknown User',
+          avatar_url: profile?.avatar_url || null
         };
       }).sort((a, b) => {
         if (a.user_id === roomData?.owner_id) return -1;
@@ -108,6 +118,18 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
     if (!isOwner) return;
 
     try {
+      // Önce study_timers tablosundan kullanıcının kronometresini sil
+      const { error: timerError } = await supabase
+        .from('study_timers')
+        .delete()
+        .eq('room_id', roomId)
+        .eq('user_id', userId);
+
+      if (timerError) {
+        console.error('Kronometre silinirken hata oluştu:', timerError);
+      }
+
+      // Sonra room_users tablosundan kullanıcıyı sil
       const { error: kickError } = await supabase
         .from('room_users')
         .delete()
@@ -116,7 +138,10 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
 
       if (kickError) throw kickError;
 
-      toast.success('User removed from room');
+      toast.success('Kullanıcı odadan çıkarıldı');
+      
+      // Kullanıcı listesinden manuel olarak kaldır
+      setRoomUsers(current => current.filter(user => user.user_id !== userId));
     } catch (error) {
       if (error instanceof Error) {
         toast.error(error.message);
@@ -134,7 +159,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
           className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl text-white font-semibold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-200 flex items-center gap-2"
         >
           <Users className="w-5 h-5" />
-          Room Members
+          Oda Üyeleri
         </motion.button>
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -146,7 +171,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
           className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl text-white font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all duration-200 flex items-center gap-2"
         >
           <Trophy className="w-5 h-5" />
-          {showLeaderboard ? 'Show Timers' : 'Leader board'}
+          {showLeaderboard ? 'Kronometreleri Göster' : 'Liderlik Tablosu'}
         </motion.button>
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -158,7 +183,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
           className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl text-white font-semibold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-200 flex items-center gap-2"
         >
           <MessageSquare className="w-5 h-5" />
-          {showChat ? 'Show Timers' : 'Open Chat'}
+          {showChat ? 'Kronometreleri Göster' : 'Sohbeti Aç'}
         </motion.button>
       </div>
 
@@ -184,6 +209,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
               userEmail={user.user_email}
               roomId={roomId}
               isCurrentUser={user.user_id === session.user.id}
+              avatar_url={user.avatar_url}
             />
           ))}
         </div>

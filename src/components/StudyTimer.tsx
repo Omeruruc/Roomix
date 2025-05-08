@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, Clock } from 'lucide-react';
+import { Play, Pause, RotateCcw, Clock, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
@@ -10,6 +10,7 @@ interface StudyTimerProps {
   userEmail: string;
   roomId: string;
   isCurrentUser?: boolean;
+  avatar_url?: string | null;
 }
 
 interface TimerState {
@@ -18,7 +19,7 @@ interface TimerState {
   subject: string;
 }
 
-export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = false }: StudyTimerProps) {
+export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = false, avatar_url }: StudyTimerProps) {
   const { theme } = useTheme();
   const [timerState, setTimerState] = useState<TimerState>({
     isRunning: false,
@@ -193,7 +194,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
     if (!isCurrentUser) return;
 
     if (!timerState.isRunning && !subject.trim() && !timerState.subject) {
-      toast.error('Please enter a subject before starting the timer');
+      toast.error('Lütfen sayacı başlatmadan önce bir konu girin');
       return;
     }
 
@@ -218,7 +219,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
       }
     } catch (error) {
       if (error instanceof Error) {
-        toast.error('Failed to update timer state');
+        toast.error('Sayaç durumu güncellenemedi');
         console.error('Error updating timer:', error);
       }
     }
@@ -245,7 +246,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
       }
     } catch (error) {
       if (error instanceof Error) {
-        toast.error('Failed to reset timer');
+        toast.error('Sayaç sıfırlanamadı');
         console.error('Error resetting timer:', error);
       }
     }
@@ -269,9 +270,27 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
           <Clock className={`w-6 h-6 ${
             theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
           }`} />
+          
+          {/* Kullanıcı avatarı */}
+          {avatar_url ? (
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-600">
+              <img
+                src={avatar_url}
+                alt={userEmail}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+              theme === 'dark' ? 'bg-gray-700' : 'bg-gray-300'
+            } border border-gray-600`}>
+              <User className="w-4 h-4 text-gray-400" />
+            </div>
+          )}
+          
           <h3 className={`text-lg font-semibold ${
             theme === 'dark' ? 'text-white' : 'text-gray-900'
-          }`}>{userEmail}'s Study Timer</h3>
+          }`}>{userEmail}'s Çalışma Sayacı</h3>
         </div>
 
         <div className="space-y-4">
@@ -281,7 +300,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
                 type="text"
                 value={subject || timerState.subject}
                 onChange={(e) => setSubject(e.target.value)}
-                placeholder="Enter subject..."
+                placeholder="Konu girin..."
                 className={`flex-1 px-4 py-2 ${
                   theme === 'dark'
                     ? 'bg-gray-700/50 border-gray-600 placeholder-gray-400'
@@ -295,7 +314,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
               <p className={`text-center ${
                 theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
               }`}>
-                Studying: {timerState.subject}
+                Çalışılan Konu: {timerState.subject}
               </p>
             )
           )}
@@ -325,12 +344,12 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
                 {timerState.isRunning ? (
                   <>
                     <Pause className="w-5 h-5" />
-                    Pause
+                    Duraklat
                   </>
                 ) : (
                   <>
                     <Play className="w-5 h-5" />
-                    Start
+                    Başlat
                   </>
                 )}
               </motion.button>
@@ -346,7 +365,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
                 } rounded-xl font-semibold transition-all duration-200 flex items-center gap-2`}
               >
                 <RotateCcw className="w-5 h-5" />
-                Reset
+                Sıfırla
               </motion.button>
             </div>
           )}
