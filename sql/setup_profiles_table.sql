@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users ON DELETE CASCADE,
   updated_at TIMESTAMP WITH TIME ZONE,
   avatar_url TEXT,
-  fullname TEXT,
   PRIMARY KEY (id)
 );
 

@@ -17,9 +17,6 @@ interface RoomViewProps {
 interface RoomUser {
   user_id: string;
   user_email: string;
-  joined_at: string;
-  fullname: string | null;
-  avatar_url: string | null;
 }
 
 export default function RoomView({ session, roomId }: RoomViewProps) {
@@ -30,76 +27,76 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
   const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
-    const fetchRoomUsers = async () => {
-      // Odaya katılan kullanıcıları al
+    const fetchRoomDetails = async () => {
+      // Check if user is room owner
+      const { data: roomData } = await supabase
+        .from('rooms')
+        .select('owner_id')
+        .eq('id', roomId)
+        .single();
+
+      if (roomData) {
+        setIsOwner(roomData.owner_id === session.user.id);
+      }
+
+      // Fetch room users
       const { data: roomUsersData, error: roomUsersError } = await supabase
         .from('room_users')
-        .select('user_id, joined_at')
-        .eq('room_id', roomId)
-        .order('joined_at', { ascending: true });
+        .select('user_id')
+        .eq('room_id', roomId);
 
       if (roomUsersError) {
-        toast.error('Kullanıcı bilgileri alınamadı');
         console.error('Error fetching room users:', roomUsersError);
         return;
       }
 
-      // Kullanıcı ID'leri topla
-      const userIds = roomUsersData.map(ru => ru.user_id);
-
-      // Kullanıcı e-posta bilgilerini al
-      const { data: userEmails, error: emailError } = await supabase
-        .rpc('get_user_emails', { user_ids: userIds });
-
-      if (emailError) {
-        toast.error('Kullanıcı email bilgileri alınamadı');
-        console.error('Error fetching user emails:', emailError);
+      if (!roomUsersData?.length) {
+        setRoomUsers([]);
         return;
       }
 
-      // Kullanıcı profil bilgilerini al
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, fullname, avatar_url')
-        .in('id', userIds);
+      const { data: userData, error: userError } = await supabase
+        .rpc('get_user_emails', {
+          user_ids: roomUsersData.map(u => u.user_id)
+        });
 
-      if (profilesError) {
-        console.error('Error fetching user profiles:', profilesError);
+      if (userError) {
+        console.error('Error fetching user data:', userError);
+        return;
       }
 
-      // Tüm kullanıcı verilerini birleştir
-      const users = roomUsersData.map((roomUser) => {
-        const email = userEmails.find((ue: { id: string, email: string }) => ue.id === roomUser.user_id)?.email || '';
-        const profile = profilesData?.find(p => p.id === roomUser.user_id);
-        
+      // Sort users so owner is always first
+      const users = roomUsersData.map(roomUser => {
+        const user = userData?.find((u: { id: string }) => u.id === roomUser.user_id);
         return {
           user_id: roomUser.user_id,
-          user_email: email,
-          joined_at: roomUser.joined_at,
-          fullname: profile?.fullname || null,
-          avatar_url: profile?.avatar_url || null
+          user_email: user?.email || 'Unknown User'
         };
+      }).sort((a, b) => {
+        if (a.user_id === roomData?.owner_id) return -1;
+        if (b.user_id === roomData?.owner_id) return 1;
+        return 0;
       });
 
       setRoomUsers(users);
-      
-      // Oda sahibi kontrolü yap
-      setIsOwner(users[0]?.user_id === session.user.id);
     };
 
-    fetchRoomUsers();
+    fetchRoomDetails();
 
-    // Realtime kullanıcı değişikliklerini izle
     const channel = supabase
       .channel(`room_users:${roomId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'room_users',
-        filter: `room_id=eq.${roomId}`
-      }, () => {
-        fetchRoomUsers();
-      })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'room_users',
+          filter: `room_id=eq.${roomId}`
+        },
+        () => {
+          fetchRoomDetails();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -180,25 +177,15 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
 
       <div className={showChat || showLeaderboard ? 'hidden' : ''}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {roomUsers
-            .sort((a, b) => {
-              // Kullanıcının kendisi ilk sırada olsun
-              if (a.user_id === session.user.id) return -1;
-              if (b.user_id === session.user.id) return 1;
-              // Diğer kullanıcılar katılma sırasına göre sıralansın
-              return new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime();
-            })
-            .map((user) => (
-              <StudyTimer
-                key={user.user_id}
-                userId={user.user_id}
-                userEmail={user.user_email}
-                roomId={roomId}
-                isCurrentUser={user.user_id === session.user.id}
-                fullname={user.fullname}
-                avatar_url={user.avatar_url}
-              />
-            ))}
+          {roomUsers.map((user) => (
+            <StudyTimer
+              key={user.user_id}
+              userId={user.user_id}
+              userEmail={user.user_email}
+              roomId={roomId}
+              isCurrentUser={user.user_id === session.user.id}
+            />
+          ))}
         </div>
       </div>
 
