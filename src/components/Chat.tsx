@@ -17,6 +17,14 @@ interface Message {
   message_type: 'text' | 'image';
   room_id: string;
   avatar_url?: string;
+  fullname?: string;
+}
+
+interface UserProfile {
+  id: string;
+  avatar_url?: string;
+  fullname?: string;
+  email: string;
 }
 
 interface ChatProps {
@@ -31,9 +39,11 @@ export default function Chat({ session, roomId }: ChatProps) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [showImagePreview, setShowImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
   
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -46,47 +56,40 @@ export default function Chat({ session, roomId }: ChatProps) {
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        // Önce tüm mesajları getir
-        const { data: messagesData, error: messagesError } = await supabase
+        const { data, error } = await supabase
           .from('messages')
           .select('*')
           .eq('room_id', roomId)
           .order('created_at', { ascending: true });
 
-        if (messagesError) {
-          toast.error('Failed to fetch messages');
-          return;
-        }
-
-        if (!messagesData || messagesData.length === 0) {
-          setMessages([]);
-          return;
-        }
-
-        // Mesajları atan her kullanıcının profil bilgilerini getir
-        const uniqueUserIds = [...new Set(messagesData.map(msg => msg.user_id))];
+        if (error) throw error;
+        
+        // Tüm kullanıcı profil bilgilerini almak için kullanıcı ID'lerini topla
+        const userIds = data.map(message => message.user_id);
+        
+        // Profil bilgilerini al
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, avatar_url')
-          .in('id', uniqueUserIds);
-
-        if (profilesError) {
-          console.error('Failed to fetch profile data:', profilesError);
-        }
-
-        // Mesajlara profil fotoğraflarını ekle
-        const messagesWithAvatars = messagesData.map(message => {
-          const userProfile = profilesData?.find(profile => profile.id === message.user_id);
+          .select('id, avatar_url, fullname')
+          .in('id', userIds);
+          
+        if (profilesError) throw profilesError;
+        
+        // Profil bilgilerini mesajlara ekle
+        const messagesWithProfiles = data.map(message => {
+          const userProfile = profilesData.find(profile => profile.id === message.user_id);
           return {
             ...message,
-            avatar_url: userProfile?.avatar_url || null
+            avatar_url: userProfile?.avatar_url || null,
+            fullname: userProfile?.fullname || null
           };
         });
 
-        setMessages(messagesWithAvatars);
+        setMessages(messagesWithProfiles);
       } catch (error) {
-        console.error('Error fetching messages:', error);
-        toast.error('Failed to fetch messages');
+        if (error instanceof Error) {
+          toast.error('Mesajlar yüklenirken hata: ' + error.message);
+        }
       }
     };
 
@@ -109,17 +112,18 @@ export default function Chat({ session, roomId }: ChatProps) {
             // Yeni mesajın kullanıcısına ait profil bilgisini getir
             const { data: profileData } = await supabase
               .from('profiles')
-              .select('avatar_url')
+              .select('avatar_url, fullname')
               .eq('id', newMessage.user_id)
               .single();
               
-            // Avatar bilgisini ekle
-            const messageWithAvatar = {
+            // Profil bilgilerini ekle
+            const messageWithProfile = {
               ...newMessage,
-              avatar_url: profileData?.avatar_url || null
+              avatar_url: profileData?.avatar_url || null,
+              fullname: profileData?.fullname || null
             };
             
-            setMessages((current) => [...current, messageWithAvatar]);
+            setMessages((current) => [...current, messageWithProfile]);
           }
         }
       )
@@ -226,185 +230,198 @@ export default function Chat({ session, roomId }: ChatProps) {
     }
   };
 
+  const handleProfileClick = async (userId: string, userEmail: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, avatar_url, fullname')
+        .eq('id', userId)
+        .single();
+        
+      if (error) throw error;
+      
+      setSelectedProfile({
+        id: userId,
+        email: userEmail,
+        avatar_url: data?.avatar_url || undefined,
+        fullname: data?.fullname || undefined
+      });
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error('Profil bilgisi alınamadı: ' + error.message);
+      }
+    }
+  };
+
   return (
-    <div className="max-w-4xl mx-auto">
-      <div 
-        className={`${
-          theme === 'dark'
-            ? 'bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-gray-700/50'
-            : 'bg-white/80 border-gray-200'
-        } backdrop-blur-lg rounded-2xl shadow-2xl border h-[600px] flex flex-col relative transition-all duration-300 ${
-          isDragging ? 'border-blue-500 border-2' : ''
-        }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        {isDragging && (
-          <div className="absolute inset-0 bg-blue-500/10 rounded-2xl flex items-center justify-center backdrop-blur-sm z-50">
-            <div className={`${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
-            } p-4 rounded-lg shadow-xl flex items-center gap-2`}>
-              <Paperclip className="w-6 h-6 text-blue-400" />
-              <p className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                Drop your image here
-              </p>
-            </div>
-          </div>
-        )}
+    <>
+      <div className="max-w-4xl mx-auto">
         <div 
-          ref={chatContainerRef}
-          className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent"
+          className={`${
+            theme === 'dark'
+              ? 'bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-gray-700/50'
+              : 'bg-white/80 border-gray-200'
+          } backdrop-blur-lg rounded-2xl shadow-2xl border h-[600px] flex flex-col relative transition-all duration-300 ${
+            isDragging ? 'border-blue-500 border-2' : ''
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         >
-          <AnimatePresence>
-            {messages.map((message) => (
-              <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.3 }}
-                className={`flex ${
-                  message.user_id === session.user.id ? 'justify-end' : 'justify-start'
-                }`}
-              >
-                {message.user_id !== session.user.id && (
-                  <div className="flex-shrink-0 mr-2">
-                    {message.avatar_url ? (
-                      <div className="w-8 h-8 rounded-full overflow-hidden">
-                        <img
-                          src={message.avatar_url}
-                          alt={message.user_email}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
-                      }`}>
-                        <User className="w-4 h-4 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                )}
-                
+          {isDragging && (
+            <div className="absolute inset-0 bg-blue-500/10 rounded-2xl flex items-center justify-center backdrop-blur-sm z-50">
+              <div className={`${
+                theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+              } p-4 rounded-lg shadow-xl flex items-center gap-2`}>
+                <Paperclip className="w-6 h-6 text-blue-400" />
+                <p className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
+                  Drop your image here
+                </p>
+              </div>
+            </div>
+          )}
+          <div 
+            ref={chatContainerRef}
+            className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent"
+          >
+            <AnimatePresence>
+              {messages.map((message) => (
                 <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  className={`max-w-[70%] rounded-2xl p-4 ${
-                    message.user_id === session.user.id
-                      ? theme === 'dark'
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                        : 'bg-blue-600 text-white'
-                      : theme === 'dark'
-                        ? 'bg-gray-800/80 text-gray-100'
-                        : 'bg-gray-100 text-gray-900'
+                  key={message.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.3 }}
+                  className={`flex ${
+                    message.user_id === session.user.id ? 'justify-end' : 'justify-start'
                   }`}
                 >
-                  <p className={`text-sm font-medium mb-1 flex flex-wrap items-center justify-between ${
-                    theme === 'dark' ? 'opacity-80' : 'opacity-70'
-                  }`}>
-                    <span className="truncate mr-2">{message.user_email}</span>
-                    <span className="text-xs opacity-70 whitespace-nowrap">
-                      {new Date(message.created_at).toLocaleTimeString('tr-TR', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </span>
-                  </p>
+                  {message.user_id !== session.user.id && (
+                    <div className="flex-shrink-0 mr-2">
+                      <div 
+                        className="flex-shrink-0 cursor-pointer" 
+                        onClick={() => handleProfileClick(message.user_id, message.user_email)}
+                      >
+                        {message.avatar_url ? (
+                          <div className="w-8 h-8 rounded-full overflow-hidden">
+                            <img
+                              src={message.avatar_url}
+                              alt={message.fullname || message.user_email}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                          }`}>
+                            <User className="w-4 h-4 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
-                  {message.message_type === 'image' ? (
-                    <motion.img 
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      src={message.image_url} 
-                      alt="Shared image" 
-                      className="rounded-lg max-w-full h-auto"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <p className="break-words">{message.content}</p>
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className={`max-w-[70%] rounded-2xl p-4 ${
+                      message.user_id === session.user.id
+                        ? theme === 'dark'
+                          ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
+                          : 'bg-blue-600 text-white'
+                        : theme === 'dark'
+                          ? 'bg-gray-800/80 text-gray-100'
+                          : 'bg-gray-100 text-gray-900'
+                    }`}
+                  >
+                    <p className={`text-sm font-medium mb-1 flex flex-wrap items-center justify-between ${
+                      theme === 'dark' ? 'opacity-80' : 'opacity-70'
+                    }`}>
+                      <span className="truncate mr-2">{message.fullname || message.user_email}</span>
+                      <span className="text-xs opacity-70 whitespace-nowrap">
+                        {new Date(message.created_at).toLocaleTimeString('tr-TR', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </span>
+                    </p>
+                    
+                    {message.message_type === 'image' ? (
+                      <motion.img 
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        src={message.image_url} 
+                        alt="Shared image" 
+                        className="rounded-lg max-w-full h-auto"
+                        loading="lazy"
+                        onClick={() => setShowImagePreview(message.image_url || null)}
+                      />
+                    ) : (
+                      <p className="break-words">{message.content}</p>
+                    )}
+                  </motion.div>
+                  
+                  {message.user_id === session.user.id && (
+                    <div className="flex-shrink-0 ml-2">
+                      <div 
+                        className="flex-shrink-0 cursor-pointer" 
+                        onClick={() => handleProfileClick(message.user_id, message.user_email)}
+                      >
+                        {message.avatar_url ? (
+                          <div className="w-8 h-8 rounded-full overflow-hidden">
+                            <img
+                              src={message.avatar_url}
+                              alt={message.fullname || message.user_email}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                          }`}>
+                            <User className="w-4 h-4 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </motion.div>
-                
-                {message.user_id === session.user.id && (
-                  <div className="flex-shrink-0 ml-2">
-                    {message.avatar_url ? (
-                      <div className="w-8 h-8 rounded-full overflow-hidden">
-                        <img
-                          src={message.avatar_url}
-                          alt={message.user_email}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
-                      }`}>
-                        <User className="w-4 h-4 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          <div ref={messagesEndRef} />
-        </div>
-        <div className="relative">
-          <AnimatePresence>
-            {showEmojiPicker && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                className="absolute bottom-full right-0 mb-2"
-              >
-                <div className="relative">
-                  <button
-                    onClick={() => setShowEmojiPicker(false)}
-                    className={`absolute -top-2 -right-2 p-1 ${
-                      theme === 'dark'
-                        ? 'bg-gray-700 hover:bg-gray-600'
-                        : 'bg-gray-200 hover:bg-gray-300'
-                    } rounded-full transition-colors`}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                  <EmojiPicker onEmojiClick={onEmojiClick} theme={theme === 'dark' ? 'dark' as any : 'light' as any} />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          <form onSubmit={handleSend} className={`p-4 border-t ${
-            theme === 'dark' ? 'border-gray-700/50' : 'border-gray-200'
-          }`}>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="flex gap-2">
-                <motion.button
-                  type="button"
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  className={`p-3 ${
-                    theme === 'dark'
-                      ? 'bg-gray-800 hover:bg-gray-700'
-                      : 'bg-gray-100 hover:bg-gray-200'
-                  } rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
+              ))}
+            </AnimatePresence>
+            <div ref={messagesEndRef} />
+          </div>
+          <div className="relative">
+            <AnimatePresence>
+              {showEmojiPicker && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="absolute bottom-full right-0 mb-2"
                 >
-                  <Smile className="w-5 h-5" />
-                </motion.button>
-                <div className="relative">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
-                    accept="image/*"
-                    className="hidden"
-                  />
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowEmojiPicker(false)}
+                      className={`absolute -top-2 -right-2 p-1 ${
+                        theme === 'dark'
+                          ? 'bg-gray-700 hover:bg-gray-600'
+                          : 'bg-gray-200 hover:bg-gray-300'
+                      } rounded-full transition-colors`}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                    <EmojiPicker onEmojiClick={onEmojiClick} theme={theme === 'dark' ? 'dark' as any : 'light' as any} />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            <form onSubmit={handleSend} className={`p-4 border-t ${
+              theme === 'dark' ? 'border-gray-700/50' : 'border-gray-200'
+            }`}>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex gap-2">
                   <motion.button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
                     className={`p-3 ${
@@ -413,41 +430,112 @@ export default function Chat({ session, roomId }: ChatProps) {
                         : 'bg-gray-100 hover:bg-gray-200'
                     } rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
                   >
-                    {isUploading ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <ImageIcon className="w-5 h-5" />
-                    )}
+                    <Smile className="w-5 h-5" />
                   </motion.button>
+                  <div className="relative">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <motion.button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`p-3 ${
+                        theme === 'dark'
+                          ? 'bg-gray-800 hover:bg-gray-700'
+                          : 'bg-gray-100 hover:bg-gray-200'
+                      } rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
+                    >
+                      {isUploading ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <ImageIcon className="w-5 h-5" />
+                      )}
+                    </motion.button>
+                  </div>
                 </div>
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  className={`flex-1 px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-800 border-gray-700'
+                      : 'bg-gray-100 border-gray-200'
+                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
+                />
+                <motion.button
+                  type="submit"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`px-6 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
+                      : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
+                  } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
+                >
+                  <Send className="w-5 h-5" />
+                </motion.button>
               </div>
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message..."
-                className={`flex-1 px-4 py-2 ${
-                  theme === 'dark'
-                    ? 'bg-gray-800 border-gray-700'
-                    : 'bg-gray-100 border-gray-200'
-                } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
-              />
-              <motion.button
-                type="submit"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className={`px-6 py-2 ${
-                  theme === 'dark'
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
-                    : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
-                } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
-              >
-                <Send className="w-5 h-5" />
-              </motion.button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Profil Görüntüleme Modal */}
+      {selectedProfile && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={`${
+              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+            } rounded-2xl p-6 max-w-sm w-full`}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                Kullanıcı Profili
+              </h2>
+              <button
+                onClick={() => setSelectedProfile(null)}
+                className={`p-2 ${
+                  theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                } rounded-lg transition-colors`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="flex flex-col items-center space-y-4">
+              <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-blue-500/40">
+                {selectedProfile.avatar_url ? (
+                  <img 
+                    src={selectedProfile.avatar_url} 
+                    alt={selectedProfile.fullname || selectedProfile.email} 
+                    className="w-full h-full object-cover cursor-pointer"
+                    onClick={() => selectedProfile.avatar_url ? setShowImagePreview(selectedProfile.avatar_url) : null}
+                  />
+                ) : (
+                  <div className={`w-full h-full flex items-center justify-center ${
+                    theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                  }`}>
+                    <User className={`w-12 h-12 ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                    }`} />
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </>
   );
 }

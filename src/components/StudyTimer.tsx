@@ -10,6 +10,8 @@ interface StudyTimerProps {
   userEmail: string;
   roomId: string;
   isCurrentUser?: boolean;
+  fullname?: string | null;
+  avatar_url?: string | null;
 }
 
 interface TimerState {
@@ -18,7 +20,7 @@ interface TimerState {
   subject: string;
 }
 
-export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = false }: StudyTimerProps) {
+export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = false, fullname: initialFullname, avatar_url }: StudyTimerProps) {
   const { theme } = useTheme();
   const [timerState, setTimerState] = useState<TimerState>({
     isRunning: false,
@@ -27,6 +29,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
   });
   const [subject, setSubject] = useState('');
   const [isVisible, setIsVisible] = useState(true);
+  const [userFullname, setUserFullname] = useState<string | null>(initialFullname || null);
   const lastUpdateRef = useRef<number>(Date.now());
   const timerRef = useRef<NodeJS.Timeout>();
   const localTimeRef = useRef<number>(0);
@@ -129,6 +132,22 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
 
   useEffect(() => {
     const loadTimerState = async () => {
+      // Önce kullanıcının hala odada olup olmadığını kontrol et
+      const { data: roomUserData, error: roomUserError } = await supabase
+        .from('room_users')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('room_id', roomId)
+        .maybeSingle();
+        
+      // Eğer kullanıcı odada değilse, kronometreyi gizle
+      if (roomUserError || !roomUserData) {
+        setIsVisible(false);
+        return;
+      } else {
+        setIsVisible(true);
+      }
+
       const { data, error } = await supabase
         .from('study_timers')
         .select('*')
@@ -188,6 +207,44 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
       }
     };
   }, [userId, roomId, isCurrentUser]);
+
+  useEffect(() => {
+    // Eğer fullname yoksa API'den almaya çalış
+    const fetchUserFullname = async () => {
+      if (!userFullname && userId) {
+        try {
+          // Önce localStorage'da kontrol et
+          if (isCurrentUser) {
+            const localFullname = localStorage.getItem('user_fullname');
+            if (localFullname) {
+              setUserFullname(localFullname);
+              return;
+            }
+          }
+          
+          // Veritabanından al
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('fullname')
+            .eq('id', userId)
+            .single();
+            
+          if (!error && data?.fullname) {
+            setUserFullname(data.fullname);
+            
+            // Eğer kendisiyse localStorage'a kaydet
+            if (isCurrentUser && data.fullname) {
+              localStorage.setItem('user_fullname', data.fullname);
+            }
+          }
+        } catch (error) {
+          console.error('İsim soy isim alınırken hata oluştu:', error);
+        }
+      }
+    };
+    
+    fetchUserFullname();
+  }, [userId, userFullname, isCurrentUser]);
 
   const handleStartStop = async () => {
     if (!isCurrentUser) return;
@@ -255,103 +312,105 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        className={`${
-          theme === 'dark'
-            ? 'bg-gray-800/50 border-gray-700/50'
-            : 'bg-white/80 border-gray-200'
-        } p-6 rounded-xl border backdrop-blur-sm`}
-      >
-        <div className="flex items-center gap-3 mb-4">
-          <Clock className={`w-6 h-6 ${
-            theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
-          }`} />
-          <h3 className={`text-lg font-semibold ${
-            theme === 'dark' ? 'text-white' : 'text-gray-900'
-          }`}>{userEmail}'s Study Timer</h3>
-        </div>
-
-        <div className="space-y-4">
-          {isCurrentUser ? (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={subject || timerState.subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="Enter subject..."
-                className={`flex-1 px-4 py-2 ${
-                  theme === 'dark'
-                    ? 'bg-gray-700/50 border-gray-600 placeholder-gray-400'
-                    : 'bg-gray-100 border-gray-200 placeholder-gray-500'
-                } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
-                disabled={timerState.isRunning}
-              />
-            </div>
-          ) : (
-            timerState.subject && (
-              <p className={`text-center ${
-                theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-              }`}>
-                Studying: {timerState.subject}
-              </p>
-            )
-          )}
-
-          <div className={`text-4xl font-bold text-center font-mono ${
-            theme === 'dark' ? 'text-white' : 'text-gray-900'
-          }`}>
-            {formatTime(timerState.time)}
+      {isVisible && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          className={`p-6 rounded-2xl ${
+            theme === 'dark'
+              ? 'bg-gradient-to-br from-gray-800 to-gray-700 shadow-lg shadow-black/20'
+              : 'bg-gradient-to-br from-white to-blue-50 shadow-lg shadow-black/10'
+          } transition-all duration-200 hover:shadow-xl`}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <Clock className={`w-6 h-6 ${
+              theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
+            }`} />
+            <h3 className={`text-lg font-semibold ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>{userFullname || initialFullname || userEmail}'s Study Timer</h3>
           </div>
 
-          {isCurrentUser && (
-            <div className="flex justify-center gap-2">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleStartStop}
-                className={`px-6 py-2 rounded-xl font-semibold shadow-lg transition-all duration-200 flex items-center gap-2 ${
-                  timerState.isRunning
-                    ? theme === 'dark'
-                      ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-red-500/30'
-                      : 'bg-red-100 text-red-600 hover:bg-red-200 shadow-red-500/20'
-                    : theme === 'dark'
-                      ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 shadow-green-500/30'
-                      : 'bg-green-100 text-green-600 hover:bg-green-200 shadow-green-500/20'
-                }`}
-              >
-                {timerState.isRunning ? (
-                  <>
-                    <Pause className="w-5 h-5" />
-                    Pause
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-5 h-5" />
-                    Start
-                  </>
-                )}
-              </motion.button>
+          <div className="space-y-4">
+            {isCurrentUser ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={subject || timerState.subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Enter subject..."
+                  className={`flex-1 px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700/50 border-gray-600 placeholder-gray-400'
+                      : 'bg-gray-100 border-gray-200 placeholder-gray-500'
+                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
+                  disabled={timerState.isRunning}
+                />
+              </div>
+            ) : (
+              timerState.subject && (
+                <p className={`text-center ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                }`}>
+                  Studying: {timerState.subject}
+                </p>
+              )
+            )}
 
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleReset}
-                className={`px-6 py-2 ${
-                  theme === 'dark'
-                    ? 'bg-gray-700/50 hover:bg-gray-700'
-                    : 'bg-gray-200 hover:bg-gray-300'
-                } rounded-xl font-semibold transition-all duration-200 flex items-center gap-2`}
-              >
-                <RotateCcw className="w-5 h-5" />
-                Reset
-              </motion.button>
+            <div className={`text-4xl font-bold text-center font-mono ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>
+              {formatTime(timerState.time)}
             </div>
-          )}
-        </div>
-      </motion.div>
+
+            {isCurrentUser && (
+              <div className="flex justify-center gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleStartStop}
+                  className={`px-6 py-2 rounded-xl font-semibold shadow-lg transition-all duration-200 flex items-center gap-2 ${
+                    timerState.isRunning
+                      ? theme === 'dark'
+                        ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 shadow-red-500/30'
+                        : 'bg-red-100 text-red-600 hover:bg-red-200 shadow-red-500/20'
+                      : theme === 'dark'
+                        ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 shadow-green-500/30'
+                        : 'bg-green-100 text-green-600 hover:bg-green-200 shadow-green-500/20'
+                  }`}
+                >
+                  {timerState.isRunning ? (
+                    <>
+                      <Pause className="w-5 h-5" />
+                      Pause
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-5 h-5" />
+                      Start
+                    </>
+                  )}
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleReset}
+                  className={`px-6 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700/50 hover:bg-gray-700'
+                      : 'bg-gray-200 hover:bg-gray-300'
+                  } rounded-xl font-semibold transition-all duration-200 flex items-center gap-2`}
+                >
+                  <RotateCcw className="w-5 h-5" />
+                  Reset
+                </motion.button>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 }

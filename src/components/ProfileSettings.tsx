@@ -14,6 +14,7 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
   const [newEmail, setNewEmail] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [fullname, setFullname] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isAvatarUploading, setIsAvatarUploading] = useState(false);
@@ -29,15 +30,16 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
       if (user) {
         setNewEmail(user.email || '');
         
-        // Profil fotoğrafını getir
+        // Profil bilgilerini getir
         const { data, error } = await supabase
           .from('profiles')
-          .select('avatar_url')
+          .select('avatar_url, fullname')
           .eq('id', user.id)
           .single();
           
         if (data && !error) {
           setAvatarUrl(data.avatar_url);
+          setFullname(data.fullname || '');
         }
       }
     };
@@ -239,6 +241,63 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
     }
   };
 
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!fullname.trim()) {
+      toast.error('İsim Soyisim alanı zorunludur');
+      return;
+    }
+    
+    setIsUpdating(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Kullanıcı bulunamadı');
+      
+      // İsim soy isimi localStorage'a kaydet
+      localStorage.setItem('user_fullname', fullname.trim());
+      
+      console.log('Profil güncelleniyor...', { 
+        id: user.id, 
+        fullname: fullname.trim() 
+      });
+      
+      // Profil bilgilerini güncelle
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          fullname: fullname.trim(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id'
+        });
+        
+      if (error) {
+        console.error('Profil güncelleme hatası:', error);
+        throw error;
+      }
+      
+      console.log('Profil güncelleme başarılı!');
+      toast.success('Profil bilgileri başarıyla güncellendi');
+      
+      // Önce kısa bir süre bildirim gösterip sonra kapat
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    } catch (error) {
+      // localStorage'daki veriyi temizle
+      localStorage.removeItem('user_fullname');
+      
+      if (error instanceof Error) {
+        console.error('Profil güncellenirken hata oluştu:', error);
+        toast.error(`Profil güncellenirken hata oluştu: ${error.message}`);
+      }
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <motion.div
@@ -246,7 +305,7 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
         animate={{ opacity: 1, scale: 1 }}
         className={`${
           theme === 'dark' ? 'bg-gray-800' : 'bg-white'
-        } rounded-2xl p-6 max-w-md w-full`}
+        } rounded-2xl p-6 max-w-md w-full overflow-y-auto max-h-[90vh]`}
       >
         <div className="flex items-center justify-between mb-6">
           <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Profil Ayarları</h2>
@@ -348,6 +407,48 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
               )}
             </div>
           </div>
+
+          {/* İsim Soyisim Formu */}
+          <form onSubmit={handleUpdateProfile} className="space-y-4">
+            <h3 className={`text-lg font-semibold ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>Kişisel Bilgiler</h3>
+            <div className="space-y-2">
+              <div className="relative">
+                <User className={`absolute left-3 top-1/2 -translate-y-1/2 ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                } w-5 h-5`} />
+                <input
+                  type="text"
+                  value={fullname}
+                  onChange={(e) => setFullname(e.target.value)}
+                  className={`w-full pl-12 pr-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-gray-100 border-gray-300 text-gray-900 placeholder-gray-500'
+                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
+                  placeholder="İsim Soyisim"
+                  required
+                />
+              </div>
+            </div>
+            <motion.button
+              type="submit"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              disabled={isUpdating}
+              className={`w-full py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-200 flex items-center justify-center gap-2 ${
+                isUpdating ? 'opacity-70 cursor-not-allowed' : ''
+              }`}
+            >
+              {isUpdating ? (
+                <Loader className="w-5 h-5 animate-spin" />
+              ) : (
+                <Save className="w-5 h-5" />
+              )}
+              Kaydet
+            </motion.button>
+          </form>
 
           {/* Email Update Form */}
           <form onSubmit={handleUpdateEmail} className="space-y-4">

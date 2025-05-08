@@ -10,6 +10,7 @@ import ThemeToggle from './components/ThemeToggle';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './contexts/ThemeContext';
 import { supabase } from './lib/supabase';
+import { motion } from 'framer-motion';
 
 function App() {
   const { session, signOut } = useAuth();
@@ -18,10 +19,52 @@ function App() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [missingFullname, setMissingFullname] = useState(false);
 
   useEffect(() => {
     if (!session && selectedRoomId) {
       setSelectedRoomId(null);
+    }
+  }, [session]);
+
+  useEffect(() => {
+    if (session) {
+      const checkUserRooms = async () => {
+        // ... existing code ...
+      };
+
+      checkUserRooms();
+      
+      const checkUserProfile = async () => {
+        try {
+          console.log('Kullanıcı profili kontrol ediliyor...');
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('fullname')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (error) {
+            console.error('Profil bilgisi alınırken hata oluştu:', error);
+            return;
+          }
+          
+          console.log('Profil durumu:', profile);
+          
+          // Eğer kullanıcının isim soyisim bilgisi yoksa açılır pencereyi göster
+          if (!profile || !profile.fullname) {
+            console.log('İsim soyisim eksik, form gösteriliyor');
+            setMissingFullname(true);
+          } else {
+            console.log('İsim soyisim mevcut:', profile.fullname);
+            setMissingFullname(false);
+          }
+        } catch (error) {
+          console.error('Profil kontrolünde hata:', error);
+        }
+      };
+      
+      checkUserProfile();
     }
   }, [session]);
 
@@ -94,7 +137,7 @@ function App() {
                 } rounded-lg transition-colors flex items-center gap-2`}
               >
                 <UserCircle className="w-5 h-5" />
-                Profile
+                Profil
               </button>
               <button
                 onClick={handleSignOut}
@@ -118,6 +161,45 @@ function App() {
 
       {showProfileSettings && (
         <ProfileSettings onClose={() => setShowProfileSettings(false)} />
+      )}
+      
+      {missingFullname && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={`${
+              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+            } rounded-2xl p-6 max-w-md w-full`}
+          >
+            <h2 className={`text-xl font-bold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+              Profilinizi Tamamlayın
+            </h2>
+            <p className={`mb-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
+              Çalışma odalarında daha iyi bir deneyim için lütfen isim ve soyisminizi giriniz.
+            </p>
+            <ProfileSettings 
+              onClose={() => {
+                // Profil kapatıldıktan sonra profilin güncellendiğini kontrol et
+                const checkProfileUpdated = async () => {
+                  if (!session) return;
+                  
+                  const { data } = await supabase
+                    .from('profiles')
+                    .select('fullname')
+                    .eq('id', session.user.id)
+                    .single();
+                    
+                  if (data && data.fullname) {
+                    setMissingFullname(false);
+                  }
+                };
+                
+                checkProfileUpdated();
+              }} 
+            />
+          </motion.div>
+        </div>
       )}
     </div>
   );
