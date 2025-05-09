@@ -8,6 +8,8 @@ interface RoomMembersProps {
     user_id: string;
     user_email: string;
     avatar_url: string | null;
+    first_name: string | null;
+    last_name: string | null;
   }>;
   isOwner: boolean;
   onKickUser: (userId: string) => void;
@@ -17,6 +19,24 @@ interface RoomMembersProps {
 export default function RoomMembers({ users, isOwner, onKickUser, onClose }: RoomMembersProps) {
   const ownerUser = users[0]; // First user is always the owner
   const { theme } = useTheme();
+
+  // Kullanıcı için gösterilecek adı oluşturan yardımcı fonksiyon
+  const getUserDisplayName = (user: RoomMembersProps['users'][0]) => {
+    // İsim ve soyisim varsa tam adı göster
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`;
+    }
+    // Sadece isim varsa
+    if (user.first_name) {
+      return user.first_name;
+    }
+    // Sadece soyisim varsa
+    if (user.last_name) {
+      return user.last_name;
+    }
+    // Hiçbiri yoksa e-posta adresini göster
+    return user.user_email;
+  };
 
   return (
     <motion.div
@@ -46,7 +66,7 @@ export default function RoomMembers({ users, isOwner, onKickUser, onClose }: Roo
                 <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-600">
                   <img
                     src={user.avatar_url}
-                    alt={user.user_email}
+                    alt={getUserDisplayName(user)}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -58,11 +78,17 @@ export default function RoomMembers({ users, isOwner, onKickUser, onClose }: Roo
                 </div>
               )}
               
-              <div className="flex items-center gap-2">
-                {user.user_id === ownerUser?.user_id && (
-                  <Crown className="w-5 h-5 text-yellow-500" />
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  {user.user_id === ownerUser?.user_id && (
+                    <Crown className="w-5 h-5 text-yellow-500" />
+                  )}
+                  <span className="font-medium">{getUserDisplayName(user)}</span>
+                </div>
+                {/* İsim ve e-posta farklıysa, e-postayı da göster */}
+                {(user.first_name || user.last_name) && (
+                  <span className="text-sm text-gray-400">{user.user_email}</span>
                 )}
-                <span>{user.user_email}</span>
               </div>
             </div>
             {isOwner && user.user_id !== ownerUser?.user_id && (

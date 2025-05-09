@@ -11,6 +11,8 @@ interface StudyTimerProps {
   roomId: string;
   isCurrentUser?: boolean;
   avatar_url?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
 }
 
 interface TimerState {
@@ -19,7 +21,7 @@ interface TimerState {
   subject: string;
 }
 
-export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = false, avatar_url }: StudyTimerProps) {
+export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = false, avatar_url, first_name, last_name }: StudyTimerProps) {
   const { theme } = useTheme();
   const [timerState, setTimerState] = useState<TimerState>({
     isRunning: false,
@@ -32,56 +34,6 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
   const timerRef = useRef<NodeJS.Timeout>();
   const localTimeRef = useRef<number>(0);
 
-  // Tüm kronometreler için genel realtime dinleme kanalını oluşturan fonksiyon
-  const setupRealtimeSubscription = () => {
-    // Oda içindeki tüm timer değişikliklerini dinleyen kanal
-    const channel = supabase
-      .channel(`room_timers_general:${roomId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'study_timers',
-          filter: `room_id=eq.${roomId}` // Tüm oda kronometrelerini dinle
-        },
-        (payload) => {
-          // Değişiklik gerçekleşen kronometreyi kontrol et
-          if (payload.new && 'user_id' in payload.new && payload.new.user_id === userId) {
-            const newData = payload.new as { 
-              is_running: boolean; 
-              elapsed_time: number; 
-              subject?: string;
-              user_id: string;
-            };
-            
-            // Lokal state'i güncelleyerek sayfa yenileme olmadan anında göster
-            setTimerState({
-              isRunning: Boolean(newData.is_running),
-              time: Number(newData.elapsed_time) || 0,
-              subject: String(newData.subject || '')
-            });
-            
-            // LocalTime referansını güncelle
-            localTimeRef.current = Number(newData.elapsed_time) || 0;
-            lastUpdateRef.current = Date.now();
-            
-            // Kronometre durdurulduğunda ya da başlatıldığında interval'i düzenle
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-            }
-            
-            if (Boolean(newData.is_running)) {
-              startInterval();
-            }
-          }
-        }
-      )
-      .subscribe();
-      
-    return channel;
-  };
-  
   // İnterval'i başlatan yardımcı fonksiyon
   const startInterval = () => {
     if (timerRef.current) {
@@ -129,44 +81,98 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
   };
 
   useEffect(() => {
+    // Timer verilerini yükle
     const loadTimerState = async () => {
-      const { data, error } = await supabase
-        .from('study_timers')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('room_id', roomId)
-        .maybeSingle();
+      try {
+        const { data, error } = await supabase
+          .from('study_timers')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('room_id', roomId)
+          .maybeSingle();
 
-      if (error) {
-        console.error('Timer verisi alınırken hata oluştu:', error);
-        return;
-      }
-
-      if (data) {
-        setTimerState({
-          isRunning: data.is_running,
-          time: data.elapsed_time,
-          subject: data.subject || ''
-        });
-        localTimeRef.current = data.elapsed_time;
-        setSubject(data.subject || '');
-        lastUpdateRef.current = Date.now();
-        
-        // Timer çalışıyorsa interval'i başlat
-        if (data.is_running) {
-          startInterval();
+        if (error) {
+          console.error('Timer verisi alınırken hata oluştu:', error);
+          return;
         }
+
+        if (data) {
+          setTimerState({
+            isRunning: data.is_running,
+            time: data.elapsed_time,
+            subject: data.subject || ''
+          });
+          localTimeRef.current = data.elapsed_time;
+          setSubject(data.subject || '');
+          lastUpdateRef.current = Date.now();
+          
+          // Timer çalışıyorsa interval'i başlat
+          if (data.is_running) {
+            startInterval();
+          }
+        }
+      } catch (err) {
+        console.error('Timer yüklenirken hata:', err);
       }
     };
 
+    // İlk yükleme
     loadTimerState();
     
-    // Realtime dinleme kanalı oluştur
-    const roomTimersChannel = setupRealtimeSubscription();
+    // Timer değişikliklerini dinle
+    const timerChannel = supabase
+      .channel(`room_timer:${roomId}:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'study_timers',
+          filter: `room_id=eq.${roomId} AND user_id=eq.${userId}`
+        },
+        (payload) => {
+          // DELETE olayı
+          if (payload.eventType === 'DELETE') {
+            console.log('Kullanıcının kronometresi silindi:', userId);
+            setIsVisible(false);
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+            }
+            return;
+          }
+          
+          // UPDATE veya INSERT olayları
+          if (payload.new) {
+            const newData = payload.new as { 
+              is_running: boolean; 
+              elapsed_time: number; 
+              subject?: string;
+            };
+            
+            setTimerState({
+              isRunning: Boolean(newData.is_running),
+              time: Number(newData.elapsed_time) || 0,
+              subject: String(newData.subject || '')
+            });
+            
+            localTimeRef.current = Number(newData.elapsed_time) || 0;
+            lastUpdateRef.current = Date.now();
+            
+            if (timerRef.current) {
+              clearInterval(timerRef.current);
+            }
+            
+            if (Boolean(newData.is_running)) {
+              startInterval();
+            }
+          }
+        }
+      )
+      .subscribe();
     
-    // Kullanıcının odadan ayrılması durumunu dinle
-    const roomUsersChannel = supabase
-      .channel(`room_users:${roomId}:${userId}`)
+    // Kullanıcı odadan çıkarıldığında kronometreyi gizle
+    const userChannel = supabase
+      .channel(`room_user:${roomId}:${userId}`)
       .on(
         'postgres_changes',
         {
@@ -176,14 +182,19 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
           filter: `room_id=eq.${roomId} AND user_id=eq.${userId}`
         },
         () => {
+          console.log('Kullanıcı odadan çıkarıldı:', userId);
           setIsVisible(false);
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+          }
         }
       )
       .subscribe();
 
+    // Cleanup
     return () => {
-      roomTimersChannel.unsubscribe();
-      roomUsersChannel.unsubscribe();
+      timerChannel.unsubscribe();
+      userChannel.unsubscribe();
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
@@ -252,6 +263,24 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
     }
   };
 
+  // Kullanıcı için gösterilecek adı oluşturan yardımcı fonksiyon
+  const getUserDisplayName = () => {
+    // İsim ve soyisim varsa tam adı göster
+    if (first_name && last_name) {
+      return `${first_name} ${last_name}`;
+    }
+    // Sadece isim varsa
+    if (first_name) {
+      return first_name;
+    }
+    // Sadece soyisim varsa
+    if (last_name) {
+      return last_name;
+    }
+    // Hiçbiri yoksa e-posta adresini göster
+    return userEmail;
+  };
+
   if (!isVisible) return null;
 
   return (
@@ -276,7 +305,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
             <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-600">
               <img
                 src={avatar_url}
-                alt={userEmail}
+                alt={getUserDisplayName()}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -288,9 +317,18 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
             </div>
           )}
           
-          <h3 className={`text-lg font-semibold ${
-            theme === 'dark' ? 'text-white' : 'text-gray-900'
-          }`}>{userEmail}'s Çalışma Sayacı</h3>
+          <div className="flex flex-col">
+            <h3 className={`text-lg font-semibold ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>{getUserDisplayName()}</h3>
+            
+            {/* İsim ve e-posta farklıysa, e-postayı küçük yazıyla göster */}
+            {(first_name || last_name) && (
+              <span className={`text-xs ${
+                theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+              }`}>{userEmail}</span>
+            )}
+          </div>
         </div>
 
         <div className="space-y-4">

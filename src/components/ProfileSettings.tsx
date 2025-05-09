@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, Save, X, Image, User, Loader } from 'lucide-react';
+import { Mail, Lock, Save, X, Image, User, Loader, UserCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -14,7 +14,10 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
   const [newEmail, setNewEmail] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isNameUpdating, setIsNameUpdating] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isAvatarUploading, setIsAvatarUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -30,14 +33,26 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
         setNewEmail(user.email || '');
         
         // Profil fotoğrafını getir
-        const { data, error } = await supabase
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('avatar_url')
           .eq('id', user.id)
           .single();
           
-        if (data && !error) {
-          setAvatarUrl(data.avatar_url);
+        if (profileData && !profileError) {
+          setAvatarUrl(profileData.avatar_url);
+        }
+        
+        // İsim ve soyisim bilgilerini getir
+        const { data: nameData, error: nameError } = await supabase
+          .from('users_fullname')
+          .select('first_name, last_name')
+          .eq('id', user.id)
+          .single();
+          
+        if (nameData && !nameError) {
+          setFirstName(nameData.first_name || '');
+          setLastName(nameData.last_name || '');
         }
       }
     };
@@ -239,6 +254,38 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
     }
   };
 
+  const handleUpdateName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsNameUpdating(true);
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Kullanıcı bulunamadı');
+      
+      const { error } = await supabase
+        .from('users_fullname')
+        .upsert({
+          id: user.id,
+          first_name: firstName,
+          last_name: lastName,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id'
+        });
+      
+      if (error) throw error;
+      
+      toast.success('İsim ve soyisim başarıyla güncellendi');
+    } catch (error) {
+      console.error('İsim güncelleme hatası:', error);
+      if (error instanceof Error) {
+        toast.error(`İsim güncellenirken hata oluştu: ${error.message}`);
+      }
+    } finally {
+      setIsNameUpdating(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <motion.div
@@ -348,6 +395,59 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
               )}
             </div>
           </div>
+
+          {/* İsim-Soyisim Güncelleme Formu */}
+          <form onSubmit={handleUpdateName} className="space-y-4">
+            <h3 className={`text-lg font-semibold ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>Kişisel Bilgiler</h3>
+            <div className="space-y-2">
+              <div className="relative">
+                <UserCheck className={`absolute left-3 top-1/2 -translate-y-1/2 ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                } w-5 h-5`} />
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className={`w-full pl-12 pr-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-gray-100 border-gray-300 text-gray-900 placeholder-gray-500'
+                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
+                  placeholder="Adınız"
+                />
+              </div>
+              <div className="relative">
+                <UserCheck className={`absolute left-3 top-1/2 -translate-y-1/2 ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                } w-5 h-5`} />
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className={`w-full pl-12 pr-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-gray-100 border-gray-300 text-gray-900 placeholder-gray-500'
+                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
+                  placeholder="Soyadınız"
+                />
+              </div>
+            </div>
+            <motion.button
+              type="submit"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              disabled={isNameUpdating}
+              className={`w-full px-4 py-2 bg-gradient-to-r from-green-500 to-teal-600 rounded-xl text-white font-semibold shadow-lg shadow-green-500/30 hover:shadow-green-500/50 transition-all duration-200 flex items-center justify-center gap-2 ${
+                isNameUpdating ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isNameUpdating ? <Loader className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+              Bilgileri Kaydet
+            </motion.button>
+          </form>
 
           {/* Email Update Form */}
           <form onSubmit={handleUpdateEmail} className="space-y-4">

@@ -18,6 +18,8 @@ interface RoomUser {
   user_id: string;
   user_email: string;
   avatar_url: string | null;
+  first_name: string | null;
+  last_name: string | null;
 }
 
 export default function RoomView({ session, roomId }: RoomViewProps) {
@@ -72,15 +74,24 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
         .select('id, avatar_url')
         .in('id', roomUsersData.map(u => u.user_id));
 
+      // Kullanıcıların isim-soyisim bilgilerini getir
+      const { data: namesData } = await supabase
+        .from('users_fullname')
+        .select('id, first_name, last_name')
+        .in('id', roomUsersData.map(u => u.user_id));
+
       // Sort users so owner is always first
       const users = roomUsersData.map(roomUser => {
         const user = userData?.find((u: { id: string }) => u.id === roomUser.user_id);
         const profile = profilesData?.find(p => p.id === roomUser.user_id);
+        const nameInfo = namesData?.find(n => n.id === roomUser.user_id);
         
         return {
           user_id: roomUser.user_id,
           user_email: user?.email || 'Unknown User',
-          avatar_url: profile?.avatar_url || null
+          avatar_url: profile?.avatar_url || null,
+          first_name: nameInfo?.first_name || null,
+          last_name: nameInfo?.last_name || null
         };
       }).sort((a, b) => {
         if (a.user_id === roomData?.owner_id) return -1;
@@ -93,17 +104,53 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
 
     fetchRoomDetails();
 
+    // Oda kullanıcılarındaki değişiklikleri dinle
     const channel = supabase
       .channel(`room_users:${roomId}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'DELETE',
+          schema: 'public',
+          table: 'room_users',
+          filter: `room_id=eq.${roomId}`
+        },
+        (payload) => {
+          // Silinen kullanıcı için payload.old nesnesini kullan
+          if (payload.old && 'user_id' in payload.old) {
+            const deletedUserId = payload.old.user_id;
+            console.log('Kullanıcı odadan çıkarıldı:', deletedUserId);
+            
+            // Eğer silinen kullanıcı yerel kullanıcı listesindeyse, listeden kaldır
+            setRoomUsers(current => 
+              current.filter(user => user.user_id !== deletedUserId)
+            );
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
           schema: 'public',
           table: 'room_users',
           filter: `room_id=eq.${roomId}`
         },
         () => {
+          // Yeni kullanıcı eklendiğinde tüm listeyi güncelle
+          fetchRoomDetails();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'room_users',
+          filter: `room_id=eq.${roomId}`
+        },
+        () => {
+          // Kullanıcı bilgileri güncellendiğinde tüm listeyi güncelle
           fetchRoomDetails();
         }
       )
@@ -118,30 +165,23 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
     if (!isOwner) return;
 
     try {
-      // Önce study_timers tablosundan kullanıcının kronometresini sil
-      const { error: timerError } = await supabase
-        .from('study_timers')
-        .delete()
-        .eq('room_id', roomId)
-        .eq('user_id', userId);
-
-      if (timerError) {
-        console.error('Kronometre silinirken hata oluştu:', timerError);
-      }
-
-      // Sonra room_users tablosundan kullanıcıyı sil
+      // Kullanıcıyı room_users tablosundan sil (App.tsx'teki odadan çıkma mantığı ile aynı)
       const { error: kickError } = await supabase
         .from('room_users')
         .delete()
         .eq('room_id', roomId)
         .eq('user_id', userId);
 
-      if (kickError) throw kickError;
+      if (kickError) {
+        console.error('Kullanıcı odadan çıkarılırken hata oluştu:', kickError);
+        toast.error('Kullanıcı odadan çıkarılırken hata oluştu');
+        return;
+      }
 
-      toast.success('Kullanıcı odadan çıkarıldı');
-      
-      // Kullanıcı listesinden manuel olarak kaldır
+      // Manuel olarak UI'dan kullanıcıyı kaldır (anında tepki için)
       setRoomUsers(current => current.filter(user => user.user_id !== userId));
+      
+      toast.success('Kullanıcı odadan çıkarıldı');
     } catch (error) {
       if (error instanceof Error) {
         toast.error(error.message);
@@ -210,6 +250,8 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
               roomId={roomId}
               isCurrentUser={user.user_id === session.user.id}
               avatar_url={user.avatar_url}
+              first_name={user.first_name}
+              last_name={user.last_name}
             />
           ))}
         </div>
