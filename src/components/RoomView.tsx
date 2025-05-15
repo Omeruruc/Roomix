@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { MessageSquare, Users, Trophy, BookOpen } from 'lucide-react';
+import { MessageSquare, Users, Trophy, BookOpen, Video } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
@@ -8,6 +8,7 @@ import StudyTimer from './StudyTimer';
 import Chat from './Chat';
 import RoomMembers from './RoomMembers';
 import Leaderboard from './Leaderboard';
+import VideoPlayer from './VideoPlayer';
 
 interface RoomViewProps {
   session: Session;
@@ -22,6 +23,13 @@ interface RoomUser {
   last_name: string | null;
 }
 
+interface RoomData {
+  owner_id: string;
+  name: string;
+  room_type: 'study' | 'watch';
+  video_url?: string;
+}
+
 export default function RoomView({ session, roomId }: RoomViewProps) {
   const [showChat, setShowChat] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
@@ -30,6 +38,8 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
   const [isOwner, setIsOwner] = useState(false);
   const [roomName, setRoomName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [roomType, setRoomType] = useState<'study' | 'watch'>('study');
+  const [videoUrl, setVideoUrl] = useState<string>('');
 
   useEffect(() => {
     const fetchRoomDetails = async () => {
@@ -37,13 +47,17 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
       // Check if user is room owner
       const { data: roomData } = await supabase
         .from('rooms')
-        .select('owner_id, name')
+        .select('owner_id, name, room_type, video_url')
         .eq('id', roomId)
         .single();
 
       if (roomData) {
         setIsOwner(roomData.owner_id === session.user.id);
-        setRoomName(roomData.name || 'Çalışma Odası');
+        setRoomName(roomData.name || 'Oda');
+        setRoomType(roomData.room_type || 'study');
+        if (roomData.video_url) {
+          setVideoUrl(roomData.video_url);
+        }
       }
 
       // Fetch room users
@@ -210,85 +224,143 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
       {/* Oda Başlığı */}
       <div className="mb-8">
         <div className="flex items-center justify-center mb-4">
-          <div className="h-14 w-14 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-lg">
-            <BookOpen className="h-7 w-7" />
+          <div className={`h-14 w-14 rounded-full ${
+            roomType === 'study' 
+              ? 'bg-blue-600' 
+              : 'bg-orange-500'
+          } flex items-center justify-center text-white shadow-lg`}>
+            {roomType === 'study' ? (
+              <BookOpen className="h-7 w-7" />
+            ) : (
+              <Video className="h-7 w-7" />
+            )}
           </div>
         </div>
-        <h1 className="text-2xl md:text-3xl font-bold text-center bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+        <h1 className={`text-2xl md:text-3xl font-bold text-center bg-gradient-to-r ${
+          roomType === 'study'
+            ? 'from-blue-500 to-purple-600'
+            : 'from-orange-500 to-red-600'
+        } bg-clip-text text-transparent`}>
           {roomName}
         </h1>
         <p className="text-center text-gray-500 dark:text-gray-400 mt-2 text-sm">
-          {roomUsers.length} kullanıcı ile aktif çalışma odası
+          {roomUsers.length} kullanıcı ile aktif {roomType === 'study' ? 'çalışma' : 'izleme'} odası
         </p>
       </div>
 
-      <div className="mb-6 flex flex-wrap justify-center gap-2">
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setShowMembers(!showMembers)}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-purple-500/30 transition-all duration-200 flex items-center gap-2"
-        >
-          <Users className="w-5 h-5" />
-          Oda Üyeleri
-        </motion.button>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => {
-            setShowLeaderboard(!showLeaderboard);
-            setShowChat(false);
-          }}
-          className="px-4 py-2 bg-orange-500 hover:bg-orange-400 rounded-xl text-white font-semibold shadow-lg hover:shadow-orange-500/30 transition-all duration-200 flex items-center gap-2"
-        >
-          <Trophy className="w-5 h-5" />
-          {showLeaderboard ? 'Kronometreleri Göster' : 'Liderlik Tablosu'}
-        </motion.button>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => {
-            setShowChat(!showChat);
-            setShowLeaderboard(false);
-          }}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2"
-        >
-          <MessageSquare className="w-5 h-5" />
-          {showChat ? 'Kronometreleri Göster' : 'Sohbeti Aç'}
-        </motion.button>
-      </div>
+      {roomType === 'study' ? (
+        <>
+          <div className="mb-6 flex flex-wrap justify-center gap-2">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowMembers(!showMembers)}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-purple-500/30 transition-all duration-200 flex items-center gap-2"
+            >
+              <Users className="w-5 h-5" />
+              Oda Üyeleri
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setShowLeaderboard(!showLeaderboard);
+                setShowChat(false);
+              }}
+              className="px-4 py-2 bg-orange-500 hover:bg-orange-400 rounded-xl text-white font-semibold shadow-lg hover:shadow-orange-500/30 transition-all duration-200 flex items-center gap-2"
+            >
+              <Trophy className="w-5 h-5" />
+              {showLeaderboard ? 'Kronometreleri Göster' : 'Liderlik Tablosu'}
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setShowChat(!showChat);
+                setShowLeaderboard(false);
+              }}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2"
+            >
+              <MessageSquare className="w-5 h-5" />
+              {showChat ? 'Kronometreleri Göster' : 'Sohbeti Aç'}
+            </motion.button>
+          </div>
 
-      <AnimatePresence mode="wait">
-        {showMembers && (
-          <RoomMembers
-            users={roomUsers}
-            isOwner={isOwner}
-            onKickUser={handleKickUser}
-            onClose={() => setShowMembers(false)}
-          />
-        )}
-      </AnimatePresence>
+          <AnimatePresence mode="wait">
+            {showMembers && (
+              <RoomMembers
+                users={roomUsers}
+                isOwner={isOwner}
+                onKickUser={handleKickUser}
+                onClose={() => setShowMembers(false)}
+              />
+            )}
+          </AnimatePresence>
 
-      {showLeaderboard && <Leaderboard roomId={roomId} />}
+          {showLeaderboard && <Leaderboard roomId={roomId} />}
 
-      <div className={showChat || showLeaderboard ? 'hidden' : ''}>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {roomUsers.map((user) => (
-            <StudyTimer
-              key={user.user_id}
-              userId={user.user_id}
-              userEmail={user.user_email}
-              roomId={roomId}
-              isCurrentUser={user.user_id === session.user.id}
-              avatar_url={user.avatar_url}
-              first_name={user.first_name}
-              last_name={user.last_name}
-            />
-          ))}
-        </div>
-      </div>
+          <div className={showChat || showLeaderboard ? 'hidden' : ''}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {roomUsers.map((user) => (
+                <StudyTimer
+                  key={user.user_id}
+                  userId={user.user_id}
+                  userEmail={user.user_email}
+                  roomId={roomId}
+                  isCurrentUser={user.user_id === session.user.id}
+                  avatar_url={user.avatar_url}
+                  first_name={user.first_name}
+                  last_name={user.last_name}
+                />
+              ))}
+            </div>
+          </div>
 
-      {showChat && <Chat session={session} roomId={roomId} />}
+          {showChat && <Chat session={session} roomId={roomId} />}
+        </>
+      ) : (
+        <>
+          <div className="mb-6 flex flex-wrap justify-center gap-2">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowMembers(!showMembers)}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-purple-500/30 transition-all duration-200 flex items-center gap-2"
+            >
+              <Users className="w-5 h-5" />
+              Oda Üyeleri
+            </motion.button>
+          </div>
+
+          <AnimatePresence mode="wait">
+            {showMembers && (
+              <RoomMembers
+                users={roomUsers}
+                isOwner={isOwner}
+                onKickUser={handleKickUser}
+                onClose={() => setShowMembers(false)}
+              />
+            )}
+          </AnimatePresence>
+
+          {videoUrl && (
+            <VideoPlayer session={session} roomId={roomId} videoUrl={videoUrl} />
+          )}
+          
+          {!videoUrl && (
+            <div className="p-8 text-center">
+              <div className="animate-pulse mb-4 mx-auto w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center">
+                <Video className="w-8 h-8 text-orange-400" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Video bulunamadı</h3>
+              <p className="text-gray-500 dark:text-gray-400">
+                Bu izleme odasında henüz bir video URL'si bulunamadı.
+                {isOwner && " Oda ayarlarından bir video URL'si ekleyebilirsiniz."}
+              </p>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, UserCircle } from 'lucide-react';
+import { MessageCircle, UserCircle, Video } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import AuthForm from './components/AuthForm';
 import RoomView from './components/RoomView';
@@ -18,12 +18,32 @@ function App() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [roomType, setRoomType] = useState<'study' | 'watch'>('study');
 
   useEffect(() => {
     if (!session && selectedRoomId) {
       setSelectedRoomId(null);
     }
   }, [session]);
+
+  // Fetch room type when selected room changes
+  useEffect(() => {
+    if (selectedRoomId) {
+      const fetchRoomType = async () => {
+        const { data } = await supabase
+          .from('rooms')
+          .select('room_type')
+          .eq('id', selectedRoomId)
+          .single();
+          
+        if (data) {
+          setRoomType(data.room_type || 'study');
+        }
+      };
+      
+      fetchRoomType();
+    }
+  }, [selectedRoomId]);
 
   const handleSignOut = async () => {
     try {
@@ -54,10 +74,20 @@ function App() {
       <Toaster position="top-center" />
       {session && (
         <div className="container mx-auto px-4 py-8">
-          <header className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 p-4 rounded-2xl shadow-lg ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-white'}">
+          <header className={`flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 p-4 rounded-2xl shadow-lg ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-white'}`}>
             <div className="flex items-center gap-2">
-              <MessageCircle className={`w-8 h-8 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">Study Room</h1>
+              {roomType === 'study' ? (
+                <MessageCircle className={`w-8 h-8 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
+              ) : (
+                <Video className={`w-8 h-8 ${theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`} />
+              )}
+              <h1 className={`text-2xl font-bold bg-gradient-to-r ${
+                roomType === 'study' 
+                  ? 'from-blue-500 to-purple-600' 
+                  : 'from-orange-500 to-red-600'
+              } bg-clip-text text-transparent`}>
+                {roomType === 'study' ? 'Study Room' : 'Watch Room'}
+              </h1>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <ThemeToggle />
@@ -106,7 +136,7 @@ function App() {
             </div>
           </header>
 
-          <main className="rounded-2xl overflow-hidden shadow-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}">
+          <main className={`rounded-2xl overflow-hidden shadow-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
             {selectedRoomId ? (
               <RoomView session={session} roomId={selectedRoomId} />
             ) : (
