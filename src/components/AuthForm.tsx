@@ -122,7 +122,7 @@ export default function AuthForm({ setIsLoading, onBack }: AuthFormProps) {
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage: 'url(https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2940&auto=format&fit=crop)',
-          filter: 'brightness(0.3)'
+          filter: 'brightness(0.2)'
         }}
       />
 
@@ -132,12 +132,12 @@ export default function AuthForm({ setIsLoading, onBack }: AuthFormProps) {
           theme === 'dark'
             ? 'bg-gray-800/50'
             : 'bg-white/50'
-        } backdrop-blur-sm rounded-xl text-white flex items-center gap-2 z-50 hover:bg-opacity-70 transition-all duration-200`}
+        } backdrop-blur-sm rounded-xl text-white flex items-center gap-2 z-50 hover:bg-opacity-70 transition-all duration-200 border border-white/10`}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
         <ArrowLeft className="w-5 h-5" />
-        Back to Home
+        Ana Sayfaya Dön
       </motion.button>
 
       {circles.map((circle, index) => (
@@ -195,148 +195,147 @@ export default function AuthForm({ setIsLoading, onBack }: AuthFormProps) {
               <motion.div
                 className={`absolute inset-0 rounded-full ${
                   theme === 'dark'
-                    ? 'bg-gradient-to-br from-blue-600 to-blue-900 border-blue-500/50'
-                    : 'bg-gradient-to-br from-blue-400 to-blue-700 border-blue-400/50'
+                    ? 'bg-gradient-to-br from-blue-600 to-indigo-900 border-blue-500/50'
+                    : 'bg-gradient-to-br from-blue-400 to-indigo-700 border-blue-400/50'
                 } border-4`}
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
               />
               <motion.div
-                className="absolute inset-0 flex items-center justify-center"
+                className="absolute inset-0 flex items-center justify-center text-white text-5xl font-bold"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
               >
-                <h1 
-                  className="text-4xl font-bold tracking-wider"
-                  style={{ 
-                    color: theme === 'dark' ? '#1a365d' : '#1e40af',
-                    textShadow: '0 0 15px rgba(59, 130, 246, 0.7)',
-                    fontFamily: 'system-ui'
-                  }}
-                >
-                  WORK!
-                </h1>
+                {isSignUp ? <UserPlus className="w-16 h-16" /> : <LogIn className="w-16 h-16" />}
               </motion.div>
             </div>
           </div>
-          
-          <motion.h2 
-            className={`text-4xl font-bold text-center mb-8 ${
-              theme === 'dark'
-                ? 'bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text'
-                : 'text-blue-600'
-            }`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-          >
-            {isSignUp ? 'Join Ding Chat' : 'Welcome Back'}
-          </motion.h2>
+
+          <div className="text-center mb-8">
+            <h1 className={`text-2xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-800'} bg-gradient-to-r from-blue-500 to-indigo-600 bg-clip-text text-transparent`}>
+              {isSignUp ? 'Hesap Oluştur' : 'Giriş Yap'}
+            </h1>
+            <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
+              {isSignUp
+                ? 'E-posta adresinizle ücretsiz hesap oluşturun'
+                : 'Hesabınıza giriş yaparak çalışmaya devam edin'}
+            </p>
+          </div>
 
           {formError && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`p-3 rounded-lg mb-4 text-sm ${
-                theme === 'dark'
-                  ? 'bg-red-500/20 text-red-400'
-                  : 'bg-red-100 text-red-600'
-              }`}
+              className="mb-6 p-3 rounded-lg bg-red-500/20 backdrop-blur-sm border border-red-500/30 text-red-200 text-sm"
             >
               {formError}
             </motion.div>
           )}
 
-          <AnimatePresence mode="wait">
-            <motion.form
-              key={isSignUp ? 'signup' : 'signin'}
-              onSubmit={isSignUp ? handleSubmit : handleSignIn}
-              className="space-y-6"
-              initial={{ opacity: 0, x: isSignUp ? 50 : -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: isSignUp ? -50 : 50 }}
-            >
-              <div className="relative">
-                <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 ${
-                  theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
-                } w-5 h-5`} />
+          <form onSubmit={isSignUp ? handleSubmit : handleSignIn}>
+            <div className="mb-6">
+              <label
+                htmlFor="email"
+                className={`block text-sm font-medium mb-2 ${
+                  theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
+              >
+                E-posta Adresi
+              </label>
+              <div className={`relative rounded-xl overflow-hidden border ${
+                theme === 'dark'
+                  ? 'bg-white/5 border-white/10 focus-within:border-blue-500/50'
+                  : 'bg-white border-gray-300 focus-within:border-blue-500'
+              } transition-all duration-200`}>
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className={`h-5 w-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+                </div>
                 <input
+                  id="email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
+                  required
+                  className={`block w-full pl-10 pr-3 py-3 ${
+                    theme === 'dark'
+                      ? 'bg-transparent text-white placeholder-gray-400'
+                      : 'text-gray-900 placeholder-gray-500'
+                  } focus:outline-none text-base`}
+                  placeholder="email@örnek.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className={`w-full pl-12 pr-4 py-3 ${
-                    theme === 'dark'
-                      ? 'bg-white/10 border-white/20 text-white placeholder-white/50'
-                      : 'bg-white border-gray-200 text-gray-900 placeholder-gray-500'
-                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
-                  placeholder="Email address"
-                  required
                 />
               </div>
-              <div className="relative">
-                <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 ${
-                  theme === 'dark' ? 'text-blue-400' : 'text-blue-600'
-                } w-5 h-5`} />
+            </div>
+
+            <div className="mb-8">
+              <label
+                htmlFor="password"
+                className={`block text-sm font-medium mb-2 ${
+                  theme === 'dark' ? 'text-gray-200' : 'text-gray-700'
+                }`}
+              >
+                Şifre
+              </label>
+              <div className={`relative rounded-xl overflow-hidden border ${
+                theme === 'dark'
+                  ? 'bg-white/5 border-white/10 focus-within:border-blue-500/50'
+                  : 'bg-white border-gray-300 focus-within:border-blue-500'
+              } transition-all duration-200`}>
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className={`h-5 w-5 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+                </div>
                 <input
+                  id="password"
+                  name="password"
                   type="password"
+                  autoComplete="current-password"
+                  required
+                  className={`block w-full pl-10 pr-3 py-3 ${
+                    theme === 'dark'
+                      ? 'bg-transparent text-white placeholder-gray-400'
+                      : 'text-gray-900 placeholder-gray-500'
+                  } focus:outline-none text-base`}
+                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full pl-12 pr-4 py-3 ${
-                    theme === 'dark'
-                      ? 'bg-white/10 border-white/20 text-white placeholder-white/50'
-                      : 'bg-white border-gray-200 text-gray-900 placeholder-gray-500'
-                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
-                  placeholder="Password"
-                  required
                 />
               </div>
-              <motion.button
-                type="submit"
-                className={`w-full py-3 px-6 ${
-                  theme === 'dark'
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
-                    : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
-                } rounded-xl text-white font-semibold shadow-lg transform hover:translate-y-[-2px] transition-all duration-200 flex items-center justify-center gap-2`}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {isSignUp ? (
-                  <>
-                    <UserPlus className="w-5 h-5" />
-                    Create Account
-                  </>
-                ) : (
-                  <>
-                    <LogIn className="w-5 h-5" />
-                    Sign In
-                  </>
-                )}
-              </motion.button>
-            </motion.form>
-          </AnimatePresence>
+            </div>
 
-          <motion.div 
-            className="mt-6 text-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-          >
-            <button
-              onClick={() => {
-                setIsSignUp(!isSignUp);
-                setFormError(null);
-              }}
-              className={`${
-                theme === 'dark'
-                  ? 'text-white/70 hover:text-white'
-                  : 'text-gray-600 hover:text-gray-900'
-              } transition-colors duration-200 text-sm`}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="submit"
+              className={`w-full py-3 px-4 rounded-xl font-medium text-white bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-200 flex items-center justify-center gap-2 border border-white/10`}
             >
-              {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
-            </button>
-          </motion.div>
+              {isSignUp ? (
+                <>
+                  <UserPlus className="w-5 h-5" />
+                  Hesap Oluştur
+                </>
+              ) : (
+                <>
+                  <LogIn className="w-5 h-5" />
+                  Giriş Yap
+                </>
+              )}
+            </motion.button>
+
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className={`text-sm ${
+                  theme === 'dark' ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'
+                } font-medium transition-colors`}
+              >
+                {isSignUp ? 'Zaten bir hesabınız var mı? Giriş yapın' : 'Hesabınız yok mu? Kayıt olun'}
+              </button>
+            </div>
+          </form>
         </motion.div>
       </div>
     </div>

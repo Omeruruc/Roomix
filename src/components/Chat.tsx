@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { Send, Smile, Image as ImageIcon, X, Loader2, Paperclip, User } from 'lucide-react';
+import { Send, Smile, Image as ImageIcon, X, Loader2, Paperclip, User, MessageSquare, Users } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import EmojiPicker, { EmojiClickData } from 'emoji-picker-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -31,6 +31,8 @@ export default function Chat({ session, roomId }: ChatProps) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [roomName, setRoomName] = useState('');
+  const [roomUsers, setRoomUsers] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -38,6 +40,66 @@ export default function Chat({ session, roomId }: ChatProps) {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Oda bilgilerini getir
+  useEffect(() => {
+    const fetchRoomDetails = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('rooms')
+          .select('name')
+          .eq('id', roomId)
+          .single();
+          
+        if (error) {
+          console.error('Oda bilgileri getirilemedi:', error);
+          return;
+        }
+        
+        if (data) {
+          setRoomName(data.name);
+        }
+        
+        // Odadaki kullanıcı sayısını al
+        const { count } = await supabase
+          .from('room_users')
+          .select('*', { count: 'exact' })
+          .eq('room_id', roomId);
+          
+        if (count !== null) {
+          setRoomUsers(count);
+        }
+        
+      } catch (error) {
+        console.error('Oda bilgileri alınamadı:', error);
+      }
+    };
+    
+    fetchRoomDetails();
+    
+    // Oda kullanıcıları değiştiğinde güncellemek için dinleyici
+    const roomUsersChannel = supabase
+      .channel('room_users_count')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'room_users', filter: `room_id=eq.${roomId}` },
+        async () => {
+          const { count } = await supabase
+            .from('room_users')
+            .select('*', { count: 'exact' })
+            .eq('room_id', roomId);
+            
+          if (count !== null) {
+            setRoomUsers(count);
+          }
+        }
+      )
+      .subscribe();
+      
+    return () => {
+      roomUsersChannel.unsubscribe();
+    };
+  }, [roomId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -229,29 +291,65 @@ export default function Chat({ session, roomId }: ChatProps) {
   return (
     <div className="max-w-4xl mx-auto">
       <div 
-        className={`${
+        className={`rounded-2xl shadow-lg h-[600px] flex flex-col relative transition-all duration-300 ${
           theme === 'dark'
-            ? 'bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-gray-700/50'
-            : 'bg-white/80 border-gray-200'
-        } backdrop-blur-lg rounded-2xl shadow-2xl border h-[600px] flex flex-col relative transition-all duration-300 ${
-          isDragging ? 'border-blue-500 border-2' : ''
+            ? 'bg-gray-800'
+            : 'bg-white'
+        } ${
+          isDragging ? 'outline outline-2 outline-blue-500' : ''
         }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        {/* Sohbet başlığı */}
+        <div className={`py-3 px-4 border-b flex items-center justify-between ${
+          theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+        }`}>
+          <div className="flex items-center space-x-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              theme === 'dark' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-blue-500 text-white'
+            }`}>
+              <MessageSquare className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className={`font-semibold text-lg ${
+                theme === 'dark' ? 'text-white' : 'text-gray-800'
+              }`}>
+                {roomName || 'Çalışma Odası'}
+              </h3>
+              <div className="flex items-center gap-1 text-xs text-gray-400">
+                <Users className="w-3.5 h-3.5" />
+                <span>{roomUsers} kullanıcı</span>
+              </div>
+            </div>
+          </div>
+          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+            theme === 'dark' 
+              ? 'bg-green-500/20 text-green-400' 
+              : 'bg-green-100 text-green-600'
+          }`}>
+            Aktif
+          </div>
+        </div>
+        
         {isDragging && (
-          <div className="absolute inset-0 bg-blue-500/10 rounded-2xl flex items-center justify-center backdrop-blur-sm z-50">
-            <div className={`${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
-            } p-4 rounded-lg shadow-xl flex items-center gap-2`}>
-              <Paperclip className="w-6 h-6 text-blue-400" />
-              <p className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>
-                Drop your image here
+          <div className="absolute inset-0 bg-blue-500/10 rounded-2xl flex items-center justify-center z-50">
+            <div className={`shadow-lg flex flex-col items-center gap-3 p-6 rounded-xl ${
+              theme === 'dark' 
+                ? 'bg-gray-800' 
+                : 'bg-white'
+            }`}>
+              <Paperclip className="w-8 h-8 text-blue-400" />
+              <p className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'} font-medium`}>
+                Görselinizi buraya bırakın
               </p>
             </div>
           </div>
         )}
+        
         <div 
           ref={chatContainerRef}
           className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent"
@@ -271,7 +369,7 @@ export default function Chat({ session, roomId }: ChatProps) {
                 {message.user_id !== session.user.id && (
                   <div className="flex-shrink-0 mr-2">
                     {message.avatar_url ? (
-                      <div className="w-8 h-8 rounded-full overflow-hidden">
+                      <div className="w-8 h-8 rounded-full overflow-hidden shadow-md">
                         <img
                           src={message.avatar_url}
                           alt={message.user_email}
@@ -279,8 +377,10 @@ export default function Chat({ session, roomId }: ChatProps) {
                         />
                       </div>
                     ) : (
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md ${
+                        theme === 'dark' 
+                          ? 'bg-gray-700' 
+                          : 'bg-gray-100'
                       }`}>
                         <User className="w-4 h-4 text-gray-400" />
                       </div>
@@ -290,13 +390,13 @@ export default function Chat({ session, roomId }: ChatProps) {
                 
                 <motion.div
                   whileHover={{ scale: 1.02 }}
-                  className={`max-w-[70%] rounded-2xl p-4 ${
+                  className={`max-w-[70%] rounded-2xl p-4 shadow-md ${
                     message.user_id === session.user.id
                       ? theme === 'dark'
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white'
-                        : 'bg-blue-600 text-white'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-blue-500 text-white'
                       : theme === 'dark'
-                        ? 'bg-gray-800/80 text-gray-100'
+                        ? 'bg-gray-700 text-gray-100'
                         : 'bg-gray-100 text-gray-900'
                   }`}
                 >
@@ -317,7 +417,7 @@ export default function Chat({ session, roomId }: ChatProps) {
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       src={message.image_url} 
-                      alt="Shared image" 
+                      alt="Paylaşılan görsel" 
                       className="rounded-lg max-w-full h-auto"
                       loading="lazy"
                     />
@@ -329,7 +429,7 @@ export default function Chat({ session, roomId }: ChatProps) {
                 {message.user_id === session.user.id && (
                   <div className="flex-shrink-0 ml-2">
                     {message.avatar_url ? (
-                      <div className="w-8 h-8 rounded-full overflow-hidden">
+                      <div className="w-8 h-8 rounded-full overflow-hidden shadow-md">
                         <img
                           src={message.avatar_url}
                           alt={message.user_email}
@@ -337,8 +437,10 @@ export default function Chat({ session, roomId }: ChatProps) {
                         />
                       </div>
                     ) : (
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md ${
+                        theme === 'dark' 
+                          ? 'bg-gray-700' 
+                          : 'bg-gray-100'
                       }`}>
                         <User className="w-4 h-4 text-gray-400" />
                       </div>
@@ -362,21 +464,23 @@ export default function Chat({ session, roomId }: ChatProps) {
                 <div className="relative">
                   <button
                     onClick={() => setShowEmojiPicker(false)}
-                    className={`absolute -top-2 -right-2 p-1 ${
+                    className={`absolute -top-2 -right-2 p-1 rounded-full z-10 shadow-md ${
                       theme === 'dark'
-                        ? 'bg-gray-700 hover:bg-gray-600'
-                        : 'bg-gray-200 hover:bg-gray-300'
-                    } rounded-full transition-colors`}
+                        ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                        : 'bg-white hover:bg-gray-100 text-gray-700'
+                    } transition-colors`}
                   >
                     <X className="w-4 h-4" />
                   </button>
-                  <EmojiPicker onEmojiClick={onEmojiClick} theme={theme === 'dark' ? 'dark' as any : 'light' as any} />
+                  <div className="shadow-xl rounded-xl overflow-hidden">
+                    <EmojiPicker onEmojiClick={onEmojiClick} theme={theme === 'dark' ? 'dark' as any : 'light' as any} />
+                  </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
           <form onSubmit={handleSend} className={`p-4 border-t ${
-            theme === 'dark' ? 'border-gray-700/50' : 'border-gray-200'
+            theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
           }`}>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="flex gap-2">
@@ -385,11 +489,11 @@ export default function Chat({ session, roomId }: ChatProps) {
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.95 }}
-                  className={`p-3 ${
+                  className={`p-3 rounded-xl transition-all duration-200 shadow-md ${
                     theme === 'dark'
-                      ? 'bg-gray-800 hover:bg-gray-700'
-                      : 'bg-gray-100 hover:bg-gray-200'
-                  } rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
+                      ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400'
+                      : 'bg-white hover:bg-gray-50 text-yellow-500'
+                  }`}
                 >
                   <Smile className="w-5 h-5" />
                 </motion.button>
@@ -407,11 +511,11 @@ export default function Chat({ session, roomId }: ChatProps) {
                     disabled={isUploading}
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
-                    className={`p-3 ${
+                    className={`p-3 rounded-xl transition-all duration-200 shadow-md ${
                       theme === 'dark'
-                        ? 'bg-gray-800 hover:bg-gray-700'
-                        : 'bg-gray-100 hover:bg-gray-200'
-                    } rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/10`}
+                        ? 'bg-gray-700 hover:bg-gray-600 text-blue-400'
+                        : 'bg-white hover:bg-gray-50 text-blue-500'
+                    }`}
                   >
                     {isUploading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -425,24 +529,25 @@ export default function Chat({ session, roomId }: ChatProps) {
                 type="text"
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message..."
-                className={`flex-1 px-4 py-2 ${
+                placeholder="Mesajınızı yazın..."
+                className={`flex-1 px-4 py-2.5 rounded-xl shadow-sm focus:shadow-md transition-all duration-200 ${
                   theme === 'dark'
-                    ? 'bg-gray-800 border-gray-700'
-                    : 'bg-gray-100 border-gray-200'
-                } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
+                    ? 'bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500/20'
+                    : 'bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500/20'
+                } outline-none`}
               />
               <motion.button
                 type="submit"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className={`px-6 py-2 ${
+                className={`px-6 py-2.5 rounded-xl text-white font-semibold shadow-lg flex items-center gap-2 ${
                   theme === 'dark'
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
-                    : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
-                } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
+                    ? 'bg-blue-600 hover:bg-blue-500'
+                    : 'bg-blue-500 hover:bg-blue-400'
+                } transition-all duration-200`}
               >
                 <Send className="w-5 h-5" />
+                <span className="hidden sm:inline">Gönder</span>
               </motion.button>
             </div>
           </form>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { MessageSquare, Users, Trophy } from 'lucide-react';
+import { MessageSquare, Users, Trophy, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
@@ -28,18 +28,22 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [roomUsers, setRoomUsers] = useState<RoomUser[]>([]);
   const [isOwner, setIsOwner] = useState(false);
+  const [roomName, setRoomName] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchRoomDetails = async () => {
+      setIsLoading(true);
       // Check if user is room owner
       const { data: roomData } = await supabase
         .from('rooms')
-        .select('owner_id')
+        .select('owner_id, name')
         .eq('id', roomId)
         .single();
 
       if (roomData) {
         setIsOwner(roomData.owner_id === session.user.id);
+        setRoomName(roomData.name || 'Çalışma Odası');
       }
 
       // Fetch room users
@@ -50,11 +54,13 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
 
       if (roomUsersError) {
         console.error('Error fetching room users:', roomUsersError);
+        setIsLoading(false);
         return;
       }
 
       if (!roomUsersData?.length) {
         setRoomUsers([]);
+        setIsLoading(false);
         return;
       }
 
@@ -65,6 +71,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
 
       if (userError) {
         console.error('Error fetching user data:', userError);
+        setIsLoading(false);
         return;
       }
 
@@ -100,6 +107,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
       });
 
       setRoomUsers(users);
+      setIsLoading(false);
     };
 
     fetchRoomDetails();
@@ -189,14 +197,37 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4">
-      <div className="mb-6 flex flex-wrap justify-end gap-2">
+      {/* Oda Başlığı */}
+      <div className="mb-8">
+        <div className="flex items-center justify-center mb-4">
+          <div className="h-14 w-14 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-lg">
+            <BookOpen className="h-7 w-7" />
+          </div>
+        </div>
+        <h1 className="text-2xl md:text-3xl font-bold text-center bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">
+          {roomName}
+        </h1>
+        <p className="text-center text-gray-500 dark:text-gray-400 mt-2 text-sm">
+          {roomUsers.length} kullanıcı ile aktif çalışma odası
+        </p>
+      </div>
+
+      <div className="mb-6 flex flex-wrap justify-center gap-2">
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowMembers(!showMembers)}
-          className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl text-white font-semibold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all duration-200 flex items-center gap-2"
+          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-purple-500/30 transition-all duration-200 flex items-center gap-2"
         >
           <Users className="w-5 h-5" />
           Oda Üyeleri
@@ -208,7 +239,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
             setShowLeaderboard(!showLeaderboard);
             setShowChat(false);
           }}
-          className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl text-white font-semibold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all duration-200 flex items-center gap-2"
+          className="px-4 py-2 bg-orange-500 hover:bg-orange-400 rounded-xl text-white font-semibold shadow-lg hover:shadow-orange-500/30 transition-all duration-200 flex items-center gap-2"
         >
           <Trophy className="w-5 h-5" />
           {showLeaderboard ? 'Kronometreleri Göster' : 'Liderlik Tablosu'}
@@ -220,7 +251,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
             setShowChat(!showChat);
             setShowLeaderboard(false);
           }}
-          className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl text-white font-semibold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-200 flex items-center gap-2"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2"
         >
           <MessageSquare className="w-5 h-5" />
           {showChat ? 'Kronometreleri Göster' : 'Sohbeti Aç'}
