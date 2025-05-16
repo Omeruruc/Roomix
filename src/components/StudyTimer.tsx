@@ -291,8 +291,8 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
         exit={{ opacity: 0, y: -20 }}
         className={`${
           theme === 'dark'
-            ? 'bg-gray-800/50 border-gray-700/50'
-            : 'bg-white/80 border-gray-200'
+            ? 'bg-gray-800/30 border-gray-700/50'
+            : 'bg-white/50 border-gray-200'
         } p-6 rounded-xl border backdrop-blur-sm`}
       >
         <div className="flex items-center gap-3 mb-4">

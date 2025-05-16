@@ -465,7 +465,7 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                     } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
                   >
                     <LogIn className="w-5 h-5" />
-                    Join
+                    <span className="hidden sm:inline">Join</span>
                   </motion.button>
                 </div>
               </div>
