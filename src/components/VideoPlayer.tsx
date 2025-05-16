@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Maximize, Loader, MessageSquare } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, SkipBack, SkipForward, Maximize, Loader, MessageSquare, Video } from 'lucide-react';
 import ReactPlayer from 'react-player';
 import { motion } from 'framer-motion';
 import { supabase } from '../lib/supabase';
@@ -37,10 +37,60 @@ export default function VideoPlayer({ session, roomId, videoUrl }: VideoPlayerPr
   const [playPauseByMe, setPlayPauseByMe] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [loadingState, setLoadingState] = useState("initializing");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const playerRef = useRef<ReactPlayer>(null);
   const throttleRef = useRef<NodeJS.Timeout | null>(null);
   const seekChangeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Video URL'sinin desteklenen bir platforma ait olup olmadığını kontrol eder
+  useEffect(() => {
+    // URL'nin geçerli bir video platformundan olup olmadığını kontrol et
+    const validateVideoUrl = (url: string): boolean => {
+      if (!url) return false;
+      
+      // Yaygın video platformlarının URL kalıplarını kontrol et
+      const patterns = [
+        // Popüler platformlar
+        /youtube\.com\/watch\?v=/,        // YouTube
+        /youtu\.be\//,                    // YouTube kısa
+        /vimeo\.com\//,                   // Vimeo
+        /facebook\.com\/.*\/videos\//,    // Facebook
+        /fb\.watch\//,                    // Facebook kısa
+        /twitch\.tv\//,                   // Twitch
+        /dailymotion\.com\/video\//,      // Dailymotion
+        /streamable\.com\//,              // Streamable
+        
+        // Film izleme siteleri için genel kalıplar
+        /\/embed\//,                      // Embed videoları
+        /\/player\//,                     // Player URL'leri
+        /\/watch\//,                      // İzleme sayfaları
+        /\.mp4/,                          // MP4 dosyaları
+        /\.m3u8/,                         // HLS stream'ler
+        /\/video\//,                      // Video path'i içerenler
+        /player\?/,                       // Player querystring'i olanlar
+        /\?vid=/,                         // Video ID'si olanlar
+        /\/play\//,                       // Play path'i içerenler
+        /stream/                          // Stream kelimesi içerenler
+      ];
+      
+      // Kalıplardan herhangi birine uyuyor mu?
+      const matchesPattern = patterns.some(pattern => pattern.test(url));
+      
+      // Kalıplara uymasa bile, bir HTTP veya HTTPS URL'si mi?
+      const isValidUrl = /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(url);
+      
+      // Ya kalıplara uyuyor, ya da geçerli bir URL ise kabul et
+      return matchesPattern || isValidUrl;
+    };
+
+    if (videoUrl && !validateVideoUrl(videoUrl)) {
+      setErrorMessage('Bu video URL formatı desteklenmiyor. Lütfen YouTube, Vimeo, Facebook, Twitch, DailyMotion veya Streamable URL\'si kullanın.');
+      setLoadingState("error");
+    } else {
+      setErrorMessage(null);
+    }
+  }, [videoUrl]);
 
   // Video senkronizasyonu için effect
   useEffect(() => {
@@ -227,142 +277,177 @@ export default function VideoPlayer({ session, roomId, videoUrl }: VideoPlayerPr
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className={`${showChat ? 'lg:col-span-2' : 'lg:col-span-3'}`}>
-          <div 
-            id="video-container"
-            className={`relative overflow-hidden rounded-2xl shadow-xl ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'
-            }`}
-          >
-            {(!isReady || loadingState === "initializing") && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-10">
-                <Loader className="w-12 h-12 text-blue-500 animate-spin mb-4" />
-                <p className="text-white text-lg">Video yükleniyor...</p>
+          {errorMessage ? (
+            <div className={`p-8 text-center rounded-2xl ${
+              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+            } shadow-xl`}>
+              <div className="animate-pulse mb-4 mx-auto w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
+                <Video className="w-8 h-8 text-red-400" />
               </div>
-            )}
-            
-            <div className="aspect-video">
-              <ReactPlayer
-                ref={playerRef}
-                url={videoUrl}
-                width="100%"
-                height="100%"
-                playing={isPlaying}
-                volume={volume}
-                muted={muted}
-                onReady={handleReady}
-                onProgress={handleProgress}
-                onDuration={setDuration}
-                onPlay={() => {
-                  if (!playPauseByMe) return;
-                  setIsPlaying(true);
-                  setPlayPauseByMe(false);
-                }}
-                onPause={() => {
-                  if (!playPauseByMe) return;
-                  setIsPlaying(false);
-                  setPlayPauseByMe(false);
-                }}
-                onError={(e: Error) => {
-                  console.error("Video player error:", e);
-                  toast.error("Video yüklenirken bir hata oluştu");
-                  setLoadingState("error");
-                }}
-                config={{
-                  youtube: {
-                    playerVars: { 
-                      disablekb: 1,
-                      modestbranding: 1
-                    }
-                  }
-                }}
-              />
+              <h3 className="text-xl font-semibold mb-4">Video yüklenemiyor</h3>
+              <p className={`mb-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
+                {errorMessage}
+              </p>
+              <div className={`p-4 rounded-lg ${
+                theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+              }`}>
+                <h4 className="font-medium mb-2">Desteklenen platformlar:</h4>
+                <ul className={`text-sm list-disc list-inside grid grid-cols-1 sm:grid-cols-2 gap-1 ${
+                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  <li>YouTube</li>
+                  <li>Vimeo</li>
+                  <li>Facebook</li>
+                  <li>Twitch</li>
+                  <li>SoundCloud</li>
+                  <li>Streamable</li>
+                  <li>Wistia</li>
+                  <li>Mixcloud</li>
+                  <li>DailyMotion</li>
+                  <li>Kaltura</li>
+                </ul>
+              </div>
             </div>
-
-            {/* Video Player Kontrolleri */}
-            <div className={`absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t ${
-              theme === 'dark' ? 'from-black/80 to-transparent' : 'from-black/70 to-transparent'
-            } transition-opacity duration-300`}>
-              {/* İlerleme çubuğu */}
-              <div className="mb-2 relative">
-                <div className="absolute left-0 right-0 h-1 bg-gray-600 rounded-full">
-                  <div
-                    className="absolute h-1 bg-gray-400 rounded-full"
-                    style={{ width: `${loaded * 100}%` }}
-                  ></div>
-                  <div
-                    className="absolute h-1 bg-blue-500 rounded-full"
-                    style={{ width: `${played * 100}%` }}
-                  ></div>
+          ) : (
+            <div 
+              id="video-container"
+              className={`relative overflow-hidden rounded-2xl shadow-xl ${
+                theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'
+              }`}
+            >
+              {(!isReady || loadingState === "initializing") && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-10">
+                  <Loader className="w-12 h-12 text-blue-500 animate-spin mb-4" />
+                  <p className="text-white text-lg">Video yükleniyor...</p>
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={0.999999}
-                  step="any"
-                  value={played}
-                  onChange={handleSeekChange}
-                  onMouseDown={handleSeekMouseDown}
-                  onMouseUp={handleSeekMouseUp}
-                  className="w-full h-2 absolute opacity-0 cursor-pointer"
+              )}
+              
+              <div className="aspect-video">
+                <ReactPlayer
+                  ref={playerRef}
+                  url={videoUrl}
+                  width="100%"
+                  height="100%"
+                  playing={isPlaying}
+                  volume={volume}
+                  muted={muted}
+                  onReady={handleReady}
+                  onProgress={handleProgress}
+                  onDuration={setDuration}
+                  onPlay={() => {
+                    if (!playPauseByMe) return;
+                    setIsPlaying(true);
+                    setPlayPauseByMe(false);
+                  }}
+                  onPause={() => {
+                    if (!playPauseByMe) return;
+                    setIsPlaying(false);
+                    setPlayPauseByMe(false);
+                  }}
+                  onError={(e: Error) => {
+                    console.error("Video player error:", e);
+                    setErrorMessage("Video yüklenirken bir hata oluştu. Lütfen desteklenen bir video URL'si kullandığınızdan emin olun.");
+                    setLoadingState("error");
+                  }}
+                  config={{
+                    youtube: {
+                      playerVars: { 
+                        disablekb: 1,
+                        modestbranding: 1
+                      }
+                    }
+                  }}
                 />
               </div>
 
-              {/* Zaman ve kontroller */}
-              <div className="flex justify-between items-center mt-3">
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={handlePlayPause} 
-                    className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
-                  >
-                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                  </button>
-                  <button 
-                    onClick={skipBackward} 
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
-                  >
-                    <SkipBack className="w-4 h-4" />
-                  </button>
-                  <button 
-                    onClick={skipForward} 
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
-                  >
-                    <SkipForward className="w-4 h-4" />
-                  </button>
-                  <div className="text-white text-sm ml-2">
-                    {formatTime(playerRef.current?.getCurrentTime() || 0)} / {formatTime(duration)}
+              {/* Video Player Kontrolleri */}
+              {isReady && !errorMessage && (
+                <div className={`absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t ${
+                  theme === 'dark' ? 'from-black/80 to-transparent' : 'from-black/70 to-transparent'
+                } transition-opacity duration-300`}>
+                  {/* İlerleme çubuğu */}
+                  <div className="mb-2 relative">
+                    <div className="absolute left-0 right-0 h-1 bg-gray-600 rounded-full">
+                      <div
+                        className="absolute h-1 bg-gray-400 rounded-full"
+                        style={{ width: `${loaded * 100}%` }}
+                      ></div>
+                      <div
+                        className="absolute h-1 bg-blue-500 rounded-full"
+                        style={{ width: `${played * 100}%` }}
+                      ></div>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={0.999999}
+                      step="any"
+                      value={played}
+                      onChange={handleSeekChange}
+                      onMouseDown={handleSeekMouseDown}
+                      onMouseUp={handleSeekMouseUp}
+                      className="w-full h-2 absolute opacity-0 cursor-pointer"
+                    />
                   </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="relative hidden sm:flex items-center">
-                    <button
-                      onClick={toggleMute}
-                      className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
-                    >
-                      {muted || volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                    </button>
-                    <div className="w-[80px] mx-2">
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step="any"
-                        value={volume}
-                        onChange={handleVolumeChange}
-                        className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
-                      />
+                  {/* Zaman ve kontroller */}
+                  <div className="flex justify-between items-center mt-3">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={handlePlayPause} 
+                        className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
+                      >
+                        {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                      </button>
+                      <button 
+                        onClick={skipBackward} 
+                        className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
+                      >
+                        <SkipBack className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={skipForward} 
+                        className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
+                      >
+                        <SkipForward className="w-4 h-4" />
+                      </button>
+                      <div className="text-white text-sm ml-2">
+                        {formatTime(playerRef.current?.getCurrentTime() || 0)} / {formatTime(duration)}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <div className="relative hidden sm:flex items-center">
+                        <button
+                          onClick={toggleMute}
+                          className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
+                        >
+                          {muted || volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                        </button>
+                        <div className="w-[80px] mx-2">
+                          <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step="any"
+                            value={volume}
+                            onChange={handleVolumeChange}
+                            className="w-full h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleFullscreen}
+                        className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
+                      >
+                        <Maximize className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={handleFullscreen}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
-                  >
-                    <Maximize className="w-4 h-4" />
-                  </button>
                 </div>
-              </div>
+              )}
             </div>
-          </div>
+          )}
 
           <div className="mt-4">
             <div className={`p-4 rounded-2xl ${
@@ -372,6 +457,9 @@ export default function VideoPlayer({ session, roomId, videoUrl }: VideoPlayerPr
               <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                 Bu video oda yöneticisi tarafından paylaşılmıştır. Herkes videoyu eş zamanlı olarak izleyebilir.
                 Play/Pause, ileri-geri sarma gibi işlemleri yapabilirsiniz ve bu kontroller odadaki herkes için senkronize olacaktır.
+              </p>
+              <p className={`text-xs mt-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                <strong>Not:</strong> Yalnızca YouTube, Vimeo, Facebook, Twitch gibi bilinen platformlardan video URL'leri desteklenmektedir.
               </p>
             </div>
           </div>

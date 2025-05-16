@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Lock, Users, Trash2, AlertCircle } from 'lucide-react';
+import { Settings, Lock, Users, Trash2, AlertCircle, Video, Info } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
@@ -10,6 +10,8 @@ interface Room {
   password_hash: string;
   max_users: number;
   owner_id: string;
+  room_type: 'study' | 'watch';
+  video_url?: string;
 }
 
 interface RoomSettingsProps {
@@ -23,11 +25,69 @@ export default function RoomSettings({ room, onClose, onRoomDeleted }: RoomSetti
   const [deletePassword, setDeletePassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [maxUsers, setMaxUsers] = useState(room.max_users);
+  const [videoUrl, setVideoUrl] = useState(room.video_url || '');
+  const [videoUrlError, setVideoUrlError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showVideoHelp, setShowVideoHelp] = useState(false);
+
+  const validateVideoUrl = (url: string): boolean => {
+    if (!url) return true; // Boş URL geçerli (video olmayan odalar için)
+    
+    // Yaygın video platformlarının URL kalıplarını kontrol et
+    const patterns = [
+      // Popüler platformlar
+      /youtube\.com\/watch\?v=/,        // YouTube
+      /youtu\.be\//,                    // YouTube kısa
+      /vimeo\.com\//,                   // Vimeo
+      /facebook\.com\/.*\/videos\//,    // Facebook
+      /fb\.watch\//,                    // Facebook kısa
+      /twitch\.tv\//,                   // Twitch
+      /dailymotion\.com\/video\//,      // Dailymotion
+      /streamable\.com\//,              // Streamable
+      
+      // Film izleme siteleri için genel kalıplar
+      /\/embed\//,                      // Embed videoları
+      /\/player\//,                     // Player URL'leri
+      /\/watch\//,                      // İzleme sayfaları
+      /\.mp4/,                          // MP4 dosyaları
+      /\.m3u8/,                         // HLS stream'ler
+      /\/video\//,                      // Video path'i içerenler
+      /player\?/,                       // Player querystring'i olanlar
+      /\?vid=/,                         // Video ID'si olanlar
+      /\/play\//,                       // Play path'i içerenler
+      /stream/                          // Stream kelimesi içerenler
+    ];
+    
+    // Kalıplardan herhangi birine uyuyor mu?
+    const matchesPattern = patterns.some(pattern => pattern.test(url));
+    
+    // Kalıplara uymasa bile, bir HTTP veya HTTPS URL'si mi?
+    const isValidUrl = /^https?:\/\/[^\s/$.?#].[^\s]*$/.test(url);
+    
+    // Ya kalıplara uyuyor, ya da geçerli bir URL ise kabul et
+    return matchesPattern || isValidUrl;
+  };
+
+  const handleVideoUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setVideoUrl(url);
+    
+    if (url && !validateVideoUrl(url)) {
+      setVideoUrlError('Bu URL desteklenmiyor. Lütfen YouTube, Vimeo gibi desteklenen bir platform URL\'si girin.');
+    } else {
+      setVideoUrlError(null);
+    }
+  };
 
   const handleUpdateSettings = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (room.room_type === 'watch' && videoUrl && !validateVideoUrl(videoUrl)) {
+      toast.error('Lütfen desteklenen bir video URL\'si girin.');
+      return;
+    }
+    
     setIsUpdating(true);
 
     try {
@@ -37,6 +97,10 @@ export default function RoomSettings({ room, onClose, onRoomDeleted }: RoomSetti
 
       if (newPassword) {
         updates.password_hash = newPassword;
+      }
+      
+      if (room.room_type === 'watch') {
+        updates.video_url = videoUrl;
       }
 
       const { error } = await supabase
@@ -137,6 +201,64 @@ export default function RoomSettings({ room, onClose, onRoomDeleted }: RoomSetti
               />
             </div>
           </div>
+          
+          {room.room_type === 'watch' && (
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-sm font-medium text-gray-300">Video URL</label>
+                <button 
+                  type="button" 
+                  onClick={() => setShowVideoHelp(!showVideoHelp)}
+                  className="text-xs flex items-center gap-1 text-blue-400 hover:text-blue-300"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                  Desteklenen Platformlar
+                </button>
+              </div>
+              <div className="relative">
+                <Video className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="url"
+                  value={videoUrl}
+                  onChange={handleVideoUrlChange}
+                  className={`w-full pl-12 pr-4 py-2 bg-gray-700 rounded-xl border ${
+                    videoUrlError 
+                      ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20' 
+                      : 'border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'
+                  } outline-none transition-all duration-200`}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                />
+              </div>
+              {videoUrlError && (
+                <p className="mt-1 text-xs text-red-400">{videoUrlError}</p>
+              )}
+              
+              {showVideoHelp && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-2 p-3 bg-gray-700/50 rounded-lg border border-gray-600"
+                >
+                  <h4 className="text-sm font-medium text-gray-300 mb-1">Desteklenen Video Platformları:</h4>
+                  <div className="grid grid-cols-2 gap-1 text-xs text-gray-400">
+                    <div>• YouTube</div>
+                    <div>• Vimeo</div>
+                    <div>• Facebook</div>
+                    <div>• Twitch</div>
+                    <div>• SoundCloud</div>
+                    <div>• Streamable</div>
+                    <div>• Wistia</div>
+                    <div>• DailyMotion</div>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Video URL'si direkt olarak video sayfasından kopyalanmalıdır. 
+                    Örnek: https://www.youtube.com/watch?v=abcdefg
+                  </p>
+                </motion.div>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-2 justify-end">
             <button
@@ -158,7 +280,7 @@ export default function RoomSettings({ room, onClose, onRoomDeleted }: RoomSetti
             </button>
             <button
               type="submit"
-              disabled={isUpdating || isDeleting}
+              disabled={isUpdating || isDeleting || (room.room_type === 'watch' && Boolean(videoUrl) && Boolean(videoUrlError))}
               className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl text-white font-semibold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-200"
             >
               {isUpdating ? 'Updating...' : 'Save Changes'}
