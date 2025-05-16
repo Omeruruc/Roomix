@@ -293,18 +293,20 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
         animate={{ opacity: 1, scale: 1 }}
         className={`${
           theme === 'dark' ? 'bg-gray-800' : 'bg-white'
-        } rounded-2xl p-6 max-w-md w-full`}
+        } rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto relative`}
       >
+        <button
+          onClick={onClose}
+          className={`absolute top-2 right-2 p-2 rounded-lg ${
+            theme === 'dark'
+              ? 'hover:bg-gray-700'
+              : 'hover:bg-gray-100'
+          } transition-colors z-10`}
+        >
+          <X className="w-5 h-5" />
+        </button>
         <div className="flex items-center justify-between mb-6">
           <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Profil Ayarları</h2>
-          <button
-            onClick={onClose}
-            className={`p-2 ${
-              theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-            } rounded-lg transition-colors`}
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         <div className="space-y-6">
