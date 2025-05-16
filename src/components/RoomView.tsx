@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { MessageSquare, Users, Trophy, BookOpen, Video } from 'lucide-react';
+import { MessageSquare, Users, Trophy, BookOpen, Video, BrainCircuit } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
@@ -9,6 +9,7 @@ import Chat from './Chat';
 import RoomMembers from './RoomMembers';
 import Leaderboard from './Leaderboard';
 import VideoPlayer from './VideoPlayer';
+import AICoach from './AICoach';
 
 interface RoomViewProps {
   session: Session;
@@ -34,6 +35,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
   const [showChat, setShowChat] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showAICoach, setShowAICoach] = useState(false);
   const [roomUsers, setRoomUsers] = useState<RoomUser[]>([]);
   const [isOwner, setIsOwner] = useState(false);
   const [roomName, setRoomName] = useState('');
@@ -266,6 +268,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
               onClick={() => {
                 setShowLeaderboard(!showLeaderboard);
                 setShowChat(false);
+                setShowAICoach(false);
               }}
               className="px-4 py-2 bg-orange-500 hover:bg-orange-400 rounded-xl text-white font-semibold shadow-lg hover:shadow-orange-500/30 transition-all duration-200 flex items-center gap-2"
             >
@@ -278,11 +281,25 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
               onClick={() => {
                 setShowChat(!showChat);
                 setShowLeaderboard(false);
+                setShowAICoach(false);
               }}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2"
             >
               <MessageSquare className="w-5 h-5" />
               {showChat ? 'Kronometreleri Göster' : 'Sohbeti Aç'}
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                setShowAICoach(!showAICoach);
+                setShowChat(false);
+                setShowLeaderboard(false);
+              }}
+              className="px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-violet-500/30 transition-all duration-200 flex items-center gap-2"
+            >
+              <BrainCircuit className="w-5 h-5" />
+              Eğitim Koçu
             </motion.button>
           </div>
 
@@ -299,7 +316,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
 
           {showLeaderboard && <Leaderboard roomId={roomId} />}
 
-          <div className={showChat || showLeaderboard ? 'hidden' : ''}>
+          <div className={showChat || showLeaderboard || showAICoach ? 'hidden' : ''}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {roomUsers.map((user) => (
                 <StudyTimer
@@ -317,6 +334,15 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
           </div>
 
           {showChat && <Chat session={session} roomId={roomId} />}
+          
+          <AnimatePresence>
+            {showAICoach && (
+              <AICoach 
+                session={session}
+                onClose={() => setShowAICoach(false)}
+              />
+            )}
+          </AnimatePresence>
         </>
       ) : (
         <>
