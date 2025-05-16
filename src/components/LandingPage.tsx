@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Users, MessageSquare, ArrowRight, BookOpen, Target, Coffee, Sparkles, Video, PlayCircle } from 'lucide-react';
+import { Clock, Users, MessageSquare, ArrowRight, BookOpen, Target, Coffee, Sparkles, Video, PlayCircle, Timer, BrainCircuit } from 'lucide-react';
 
 interface LandingPageProps {
   onAuthClick: () => void;
@@ -137,67 +137,54 @@ export default function LandingPage({ onAuthClick }: LandingPageProps) {
       {/* Features Section */}
       <section className="py-20 border-y border-white/10">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="p-8 rounded-2xl shadow-xl group hover:bg-white/5 transition-all duration-300 bg-gray-800/40"
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 shadow-xl"
             >
-              <div className="w-14 h-14 bg-blue-600/20 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-500/30 transition-all">
-                <Clock className="w-7 h-7 text-blue-400" />
+              <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mb-4">
+                <Users className="w-6 h-6 text-blue-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Çalışma Zamanlayıcısı</h3>
+              <h3 className="text-xl font-semibold mb-2">Çalışma Arkadaşları</h3>
               <p className="text-gray-300">
-                Senkronize zamanlayıcı ile çalışma seanslarını takip et. Herkesin ilerlemesini gerçek zamanlı olarak gör.
+                Arkadaşlarınızla birlikte çalışın, motivasyonunuzu artırın ve hedeflerinize birlikte ulaşın.
               </p>
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.15 }}
-              className="p-8 rounded-2xl shadow-xl group hover:bg-white/5 transition-all duration-300 bg-gray-800/40"
-            >
-              <div className="w-14 h-14 bg-purple-600/20 rounded-xl flex items-center justify-center mb-6 group-hover:bg-purple-500/30 transition-all">
-                <MessageSquare className="w-7 h-7 text-purple-400" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Gerçek Zamanlı Sohbet</h3>
-              <p className="text-gray-300">
-                Çalışma veya izleme grubunla anında iletişim kur. Fikirleri paylaş ve bağlantıda kal.
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="p-8 rounded-2xl shadow-xl group hover:bg-white/5 transition-all duration-300 bg-gray-800/40"
+              className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 shadow-xl"
             >
-              <div className="w-14 h-14 bg-pink-600/20 rounded-xl flex items-center justify-center mb-6 group-hover:bg-pink-500/30 transition-all">
-                <Users className="w-7 h-7 text-pink-400" />
+              <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-4">
+                <Timer className="w-6 h-6 text-purple-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Çalışma Odaları</h3>
+              <h3 className="text-xl font-semibold mb-2">Pomodoro Zamanlayıcı</h3>
               <p className="text-gray-300">
-                Çalışma grubu için özel odalar oluştur. Erişimi yönet ve alanını odaklanmış tut.
+                Pomodoro tekniği ile daha verimli çalışın, odaklanmanızı artırın ve molalarınızı düzenleyin.
               </p>
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.45 }}
-              className="p-8 rounded-2xl shadow-xl group hover:bg-white/5 transition-all duration-300 bg-gray-800/40"
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="bg-white/10 backdrop-blur-lg rounded-2xl p-6 shadow-xl relative overflow-hidden"
             >
-              <div className="w-14 h-14 bg-orange-600/20 rounded-xl flex items-center justify-center mb-6 group-hover:bg-orange-500/30 transition-all">
-                <PlayCircle className="w-7 h-7 text-orange-400" />
+              <div className="absolute top-0 right-0">
+                <div className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-xs px-2 py-1 rounded-bl-lg">
+                  PRO
+                </div>
               </div>
-              <h3 className="text-xl font-semibold mb-3">Beraber İzleme</h3>
+              <div className="w-12 h-12 bg-violet-500/20 rounded-xl flex items-center justify-center mb-4">
+                <BrainCircuit className="w-6 h-6 text-violet-400" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">AI Eğitim Koçu</h3>
               <p className="text-gray-300">
-                Film, dizi ve videolarını arkadaşlarınla eş zamanlı izle. Kontroller otomatik olarak senkronize edilir.
+                Yapay zeka destekli eğitim koçu ile kişiselleştirilmiş çalışma planları oluşturun ve akademik başarınızı artırın.
               </p>
             </motion.div>
           </div>

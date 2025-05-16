@@ -371,7 +371,7 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                 } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
               >
                 <Sparkles className="w-5 h-5" />
-                <span className="hidden sm:inline">Pro'ya Yükselt</span>
+                Pro'ya Yükselt
               </motion.button>
             )}
             {!createRoomMode ? (
