@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { Plus, Lock, LogIn, Settings, Search, BookOpen, Video } from 'lucide-react';
+import { Plus, Lock, LogIn, Settings, Search, BookOpen, Video, Crown, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
@@ -40,6 +40,10 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
   const [roomType, setRoomType] = useState<'study' | 'watch'>('study');
   const [videoUrl, setVideoUrl] = useState('');
   const [createRoomMode, setCreateRoomMode] = useState<boolean>(false);
+  const [isPro, setIsPro] = useState(false);
+  const [showProModal, setShowProModal] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [isLoadingPro, setIsLoadingPro] = useState(false);
 
   useEffect(() => {
     fetchRooms();
@@ -87,6 +91,10 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
     }
   }, [searchQuery, rooms, session.user.id]);
 
+  useEffect(() => {
+    checkProStatus();
+  }, [session]);
+
   const fetchRooms = async () => {
     const { data, error } = await supabase
       .from('rooms')
@@ -107,6 +115,58 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
 
     setRooms(sortedRooms);
     setFilteredRooms(sortedRooms);
+  };
+
+  const checkProStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('is_pro')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (error) throw error;
+      setIsPro(data?.is_pro || false);
+    } catch (error) {
+      console.error('Pro durumu kontrol edilirken hata:', error);
+    }
+  };
+
+  const handleProUpgrade = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!promoCode.trim()) {
+      toast.error('Lütfen bir promosyon kodu girin');
+      return;
+    }
+
+    setIsLoadingPro(true);
+    try {
+      if (promoCode !== 'WORK100') {
+        toast.error('Geçersiz promosyon kodu');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('user_subscriptions')
+        .upsert({
+          user_id: session.user.id,
+          is_pro: true,
+          promo_code: promoCode,
+          activated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      setIsPro(true);
+      setShowProModal(false);
+      setPromoCode('');
+      toast.success('Pro versiyona başarıyla yükseltildiniz!');
+    } catch (error) {
+      console.error('Pro yükseltme hatası:', error);
+      toast.error('Pro yükseltme işlemi başarısız oldu');
+    } finally {
+      setIsLoadingPro(false);
+    }
   };
 
   const createRoom = async (e: React.FormEvent) => {
@@ -283,75 +343,100 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
           : 'bg-white/80'
         } backdrop-blur-lg rounded-2xl shadow-2xl p-6`}>
         <div className="flex justify-between items-center mb-6">
-          <h2 className={`text-2xl font-bold ${
-            theme === 'dark'
-              ? 'bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text'
-              : 'text-blue-600'
-          }`}>
-            Chat Rooms
-          </h2>
-          {!createRoomMode ? (
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setCreateRoomMode(true)}
-              className={`px-4 py-2 ${
-                theme === 'dark'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
-                  : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
-              } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
-            >
-              <Plus className="w-5 h-5" />
-              Create Room
-            </motion.button>
-          ) : (
-            <div className="flex gap-3">
+          <div className="flex items-center gap-2">
+            <h2 className={`text-2xl font-bold ${
+              theme === 'dark'
+                ? 'bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text'
+                : 'text-blue-600'
+            }`}>
+              Chat Rooms
+            </h2>
+          </div>
+          <div className="flex items-center gap-3">
+            {isPro && (
+              <span className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full text-white text-sm">
+                <Crown className="w-4 h-4" />
+                PRO
+              </span>
+            )}
+            {!isPro && (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setRoomType('study');
-                  setShowCreateModal(true);
-                }}
+                onClick={() => setShowProModal(true)}
+                className={`px-4 py-2 ${
+                  theme === 'dark'
+                    ? 'bg-gradient-to-r from-yellow-500 to-orange-500 shadow-yellow-500/30 hover:shadow-yellow-500/50'
+                    : 'bg-yellow-500 hover:bg-yellow-600 shadow-yellow-500/30 hover:shadow-yellow-500/50'
+                } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
+              >
+                <Sparkles className="w-5 h-5" />
+                <span className="hidden sm:inline">Pro'ya Yükselt</span>
+              </motion.button>
+            )}
+            {!createRoomMode ? (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setCreateRoomMode(true)}
                 className={`px-4 py-2 ${
                   theme === 'dark'
                     ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
                     : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
                 } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
               >
-                <BookOpen className="w-5 h-5" />
-                Study Room
+                <Plus className="w-5 h-5" />
+                Create Room
               </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setRoomType('watch');
-                  setShowCreateModal(true);
-                }}
-                className={`px-4 py-2 ${
-                  theme === 'dark'
-                    ? 'bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/30 hover:shadow-orange-500/50'
-                    : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30 hover:shadow-orange-500/50'
-                } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
-              >
-                <Video className="w-5 h-5" />
-                Watch Room
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setCreateRoomMode(false)}
-                className={`px-4 py-2 ${
-                  theme === 'dark'
-                    ? 'bg-gray-700 hover:bg-gray-600'
-                    : 'bg-gray-200 hover:bg-gray-300'
-                } rounded-xl transition-colors`}
-              >
-                Cancel
-              </motion.button>
-            </div>
-          )}
+            ) : (
+              <div className="flex gap-3">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setRoomType('study');
+                    setShowCreateModal(true);
+                  }}
+                  className={`px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
+                      : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
+                  } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
+                >
+                  <BookOpen className="w-5 h-5" />
+                  Study Room
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setRoomType('watch');
+                    setShowCreateModal(true);
+                  }}
+                  className={`px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/30 hover:shadow-orange-500/50'
+                      : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30 hover:shadow-orange-500/50'
+                  } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
+                >
+                  <Video className="w-5 h-5" />
+                  Watch Room
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setCreateRoomMode(false)}
+                  className={`px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 hover:bg-gray-600'
+                      : 'bg-gray-200 hover:bg-gray-300'
+                  } rounded-xl transition-colors`}
+                >
+                  Cancel
+                </motion.button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="mb-6 relative">
@@ -630,6 +715,69 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
             fetchRooms();
           }}
         />
+      )}
+
+      {/* Pro Upgrade Modal */}
+      {showProModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className={`${
+              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+            } rounded-2xl p-6 max-w-md w-full`}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className={`w-6 h-6 ${
+                theme === 'dark' ? 'text-yellow-400' : 'text-yellow-500'
+              }`} />
+              <h2 className={`text-xl font-bold ${
+                theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}>Pro'ya Yükselt</h2>
+            </div>
+            <form onSubmit={handleProUpgrade} className="space-y-4">
+              <div>
+                <label className={`block text-sm font-medium mb-1 ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                }`}>
+                  Promosyon Kodu
+                </label>
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
+                  className={`w-full px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600'
+                      : 'bg-gray-100 border-gray-200'
+                  } rounded-xl border focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 outline-none transition-all duration-200`}
+                  placeholder="Promosyon kodunuzu girin"
+                  required
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowProModal(false)}
+                  className={`px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 hover:bg-gray-600'
+                      : 'bg-gray-200 hover:bg-gray-300'
+                  } rounded-xl transition-colors`}
+                >
+                  İptal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoadingPro}
+                  className="px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-xl text-white font-semibold shadow-lg shadow-yellow-500/30 hover:shadow-yellow-500/50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoadingPro ? 'Yükleniyor...' : 'Yükselt'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
       )}
     </div>
   );

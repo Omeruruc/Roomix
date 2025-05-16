@@ -42,6 +42,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [roomType, setRoomType] = useState<'study' | 'watch'>('study');
   const [videoUrl, setVideoUrl] = useState<string>('');
+  const [isPro, setIsPro] = useState(false);
 
   useEffect(() => {
     const fetchRoomDetails = async () => {
@@ -185,6 +186,25 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
     };
   }, [roomId, session.user.id]);
 
+  useEffect(() => {
+    checkProStatus();
+  }, [session]);
+
+  const checkProStatus = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('is_pro')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (error) throw error;
+      setIsPro(data?.is_pro || false);
+    } catch (error) {
+      console.error('Pro durumu kontrol edilirken hata:', error);
+    }
+  };
+
   const handleKickUser = async (userId: string) => {
     if (!isOwner) return;
 
@@ -288,19 +308,34 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
               <MessageSquare className="w-5 h-5" />
               {showChat ? 'Kronometreleri Göster' : 'Sohbeti Aç'}
             </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                setShowAICoach(!showAICoach);
-                setShowChat(false);
-                setShowLeaderboard(false);
-              }}
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-violet-500/30 transition-all duration-200 flex items-center gap-2"
-            >
-              <BrainCircuit className="w-5 h-5" />
-              Eğitim Koçu
-            </motion.button>
+            <div className="relative group">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (!isPro) {
+                    toast.error('Bu özellik sadece Pro kullanıcılar içindir');
+                    return;
+                  }
+                  setShowAICoach(!showAICoach);
+                  setShowChat(false);
+                  setShowLeaderboard(false);
+                }}
+                className={`px-4 py-2 ${
+                  isPro
+                    ? 'bg-violet-600 hover:bg-violet-500'
+                    : 'bg-violet-600/50 cursor-not-allowed'
+                } rounded-xl text-white font-semibold shadow-lg hover:shadow-violet-500/30 transition-all duration-200 flex items-center gap-2`}
+              >
+                <BrainCircuit className="w-5 h-5" />
+                Eğitim Koçu
+              </motion.button>
+              {!isPro && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1 bg-gray-900 text-white text-sm rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                  Pro özelliği ile açılır
+                </div>
+              )}
+            </div>
           </div>
 
           <AnimatePresence mode="wait">
