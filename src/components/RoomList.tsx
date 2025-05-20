@@ -344,13 +344,13 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
         } backdrop-blur-lg rounded-2xl shadow-2xl p-6`}>
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
-            <h2 className={`text-2xl font-bold ${
-              theme === 'dark'
-                ? 'bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text'
-                : 'text-blue-600'
-            }`}>
-              Chat Rooms
-            </h2>
+          <h2 className={`text-2xl font-bold ${
+            theme === 'dark'
+              ? 'bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text'
+              : 'text-blue-600'
+          }`}>
+            Chat Rooms
+          </h2>
           </div>
           <div className="flex items-center gap-3">
             {isPro && (
@@ -374,68 +374,68 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                 Pro'ya Yükselt
               </motion.button>
             )}
-            {!createRoomMode ? (
+          {!createRoomMode ? (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setCreateRoomMode(true)}
+              className={`px-4 py-2 ${
+                theme === 'dark'
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
+                  : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
+              } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
+            >
+              <Plus className="w-5 h-5" />
+              Create Room
+            </motion.button>
+          ) : (
+            <div className="flex gap-3">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setCreateRoomMode(true)}
+                onClick={() => {
+                  setRoomType('study');
+                  setShowCreateModal(true);
+                }}
                 className={`px-4 py-2 ${
                   theme === 'dark'
                     ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
                     : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
                 } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
               >
-                <Plus className="w-5 h-5" />
-                Create Room
+                <BookOpen className="w-5 h-5" />
+                Study Room
               </motion.button>
-            ) : (
-              <div className="flex gap-3">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    setRoomType('study');
-                    setShowCreateModal(true);
-                  }}
-                  className={`px-4 py-2 ${
-                    theme === 'dark'
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
-                      : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
-                  } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
-                >
-                  <BookOpen className="w-5 h-5" />
-                  Study Room
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    setRoomType('watch');
-                    setShowCreateModal(true);
-                  }}
-                  className={`px-4 py-2 ${
-                    theme === 'dark'
-                      ? 'bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/30 hover:shadow-orange-500/50'
-                      : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30 hover:shadow-orange-500/50'
-                  } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
-                >
-                  <Video className="w-5 h-5" />
-                  Watch Room
-                </motion.button>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setCreateRoomMode(false)}
-                  className={`px-4 py-2 ${
-                    theme === 'dark'
-                      ? 'bg-gray-700 hover:bg-gray-600'
-                      : 'bg-gray-200 hover:bg-gray-300'
-                  } rounded-xl transition-colors`}
-                >
-                  Cancel
-                </motion.button>
-              </div>
-            )}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setRoomType('watch');
+                  setShowCreateModal(true);
+                }}
+                className={`px-4 py-2 ${
+                  theme === 'dark'
+                    ? 'bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/30 hover:shadow-orange-500/50'
+                    : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30 hover:shadow-orange-500/50'
+                } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
+              >
+                <Video className="w-5 h-5" />
+                Watch Room
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setCreateRoomMode(false)}
+                className={`px-4 py-2 ${
+                  theme === 'dark'
+                    ? 'bg-gray-700 hover:bg-gray-600'
+                    : 'bg-gray-200 hover:bg-gray-300'
+                } rounded-xl transition-colors`}
+              >
+                Cancel
+              </motion.button>
+            </div>
+          )}
           </div>
         </div>
 

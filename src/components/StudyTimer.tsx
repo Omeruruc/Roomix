@@ -33,29 +33,16 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
   const lastUpdateRef = useRef<number>(Date.now());
   const timerRef = useRef<NodeJS.Timeout>();
   const localTimeRef = useRef<number>(0);
+  const lastSyncTimeRef = useRef<number>(0);
 
-  // İnterval'i başlatan yardımcı fonksiyon
-  const startInterval = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-    
-    timerRef.current = setInterval(() => {
-      localTimeRef.current += 1;
-      setTimerState(prev => ({
-        ...prev,
-        time: localTimeRef.current
-      }));
-      
-      // Server güncelleme işlemi aktif kullanıcı için
-      if (isCurrentUser && Date.now() - lastUpdateRef.current >= 1000) {
-        updateServerTimer(localTimeRef.current, true);
-      }
-    }, 1000);
-  };
-  
   // Server'a timer durumunu güncelleyen fonksiyon
-  const updateServerTimer = async (elapsedTime: number, isRunning: boolean) => {
+  const updateServerTimer = async (elapsedTime: number, isRunning: boolean, forceUpdate: boolean = false) => {
+    const now = Date.now();
+    // Son güncelleme üzerinden 1 saniye geçmemişse ve zorunlu güncelleme değilse, güncelleme yapma
+    if (!forceUpdate && now - lastUpdateRef.current < 1000) {
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('study_timers')
@@ -73,11 +60,36 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
       if (error) {
         console.error('Timer güncellenirken hata oluştu:', error);
       } else {
-        lastUpdateRef.current = Date.now();
+        lastUpdateRef.current = now;
+        lastSyncTimeRef.current = elapsedTime;
       }
     } catch (error) {
       console.error('Timer güncellenirken hata oluştu:', error);
     }
+  };
+
+  // İnterval'i başlatan yardımcı fonksiyon
+  const startInterval = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    
+    timerRef.current = setInterval(() => {
+      const now = Date.now();
+      const timeSinceLastSync = Math.floor((now - lastUpdateRef.current) / 1000);
+      const newTime = lastSyncTimeRef.current + timeSinceLastSync;
+      
+      localTimeRef.current = newTime;
+      setTimerState(prev => ({
+        ...prev,
+        time: newTime
+      }));
+      
+      // Her 5 saniyede bir server ile senkronize et
+      if (isCurrentUser && timeSinceLastSync >= 5) {
+        updateServerTimer(newTime, true, true);
+      }
+    }, 1000);
   };
 
   useEffect(() => {
@@ -97,14 +109,25 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
         }
 
         if (data) {
+          const now = Date.now();
+          const lastUpdate = new Date(data.updated_at).getTime();
+          let elapsedTime = data.elapsed_time;
+
+          // Eğer timer çalışıyorsa, son güncelleme ile şu an arasındaki süreyi ekle
+          if (data.is_running) {
+            const timeDiff = Math.floor((now - lastUpdate) / 1000);
+            elapsedTime += timeDiff;
+          }
+
           setTimerState({
             isRunning: data.is_running,
-            time: data.elapsed_time,
+            time: elapsedTime,
             subject: data.subject || ''
           });
-          localTimeRef.current = data.elapsed_time;
+          localTimeRef.current = elapsedTime;
+          lastSyncTimeRef.current = elapsedTime;
+          lastUpdateRef.current = now;
           setSubject(data.subject || '');
-          lastUpdateRef.current = Date.now();
           
           // Timer çalışıyorsa interval'i başlat
           if (data.is_running) {
@@ -131,9 +154,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
           filter: `room_id=eq.${roomId} AND user_id=eq.${userId}`
         },
         (payload) => {
-          // DELETE olayı
           if (payload.eventType === 'DELETE') {
-            console.log('Kullanıcının kronometresi silindi:', userId);
             setIsVisible(false);
             if (timerRef.current) {
               clearInterval(timerRef.current);
@@ -141,22 +162,33 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
             return;
           }
           
-          // UPDATE veya INSERT olayları
           if (payload.new) {
             const newData = payload.new as { 
               is_running: boolean; 
               elapsed_time: number; 
               subject?: string;
+              updated_at: string;
             };
             
+            const now = Date.now();
+            const lastUpdate = new Date(newData.updated_at).getTime();
+            let elapsedTime = Number(newData.elapsed_time) || 0;
+
+            // Eğer timer çalışıyorsa, son güncelleme ile şu an arasındaki süreyi ekle
+            if (Boolean(newData.is_running)) {
+              const timeDiff = Math.floor((now - lastUpdate) / 1000);
+              elapsedTime += timeDiff;
+            }
+
             setTimerState({
               isRunning: Boolean(newData.is_running),
-              time: Number(newData.elapsed_time) || 0,
+              time: elapsedTime,
               subject: String(newData.subject || '')
             });
             
-            localTimeRef.current = Number(newData.elapsed_time) || 0;
-            lastUpdateRef.current = Date.now();
+            localTimeRef.current = elapsedTime;
+            lastSyncTimeRef.current = elapsedTime;
+            lastUpdateRef.current = now;
             
             if (timerRef.current) {
               clearInterval(timerRef.current);

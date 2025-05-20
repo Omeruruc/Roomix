@@ -14,6 +14,7 @@ import AICoach from './AICoach';
 interface RoomViewProps {
   session: Session;
   roomId: string;
+  onLeaveRoom: () => void;
 }
 
 interface RoomUser {
@@ -31,7 +32,7 @@ interface RoomData {
   video_url?: string;
 }
 
-export default function RoomView({ session, roomId }: RoomViewProps) {
+export default function RoomView({ session, roomId, onLeaveRoom }: RoomViewProps) {
   const [showChat, setShowChat] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -47,84 +48,112 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
   useEffect(() => {
     const fetchRoomDetails = async () => {
       setIsLoading(true);
-      // Check if user is room owner
-      const { data: roomData } = await supabase
-        .from('rooms')
-        .select('owner_id, name, room_type, video_url')
-        .eq('id', roomId)
-        .single();
+      try {
+        // Check if user is room owner
+        const { data: roomData } = await supabase
+          .from('rooms')
+          .select('owner_id, name, room_type, video_url')
+          .eq('id', roomId)
+          .single();
 
-      if (roomData) {
-        setIsOwner(roomData.owner_id === session.user.id);
-        setRoomName(roomData.name || 'Oda');
-        setRoomType(roomData.room_type || 'study');
-        if (roomData.video_url) {
-          setVideoUrl(roomData.video_url);
+        if (roomData) {
+          setIsOwner(roomData.owner_id === session.user.id);
+          setRoomName(roomData.name || 'Oda');
+          setRoomType(roomData.room_type || 'study');
+          if (roomData.video_url) {
+            setVideoUrl(roomData.video_url);
+          }
+
+          // Odaya otomatik katıl
+          const { data: existingMembership } = await supabase
+            .from('room_users')
+            .select('*')
+            .eq('room_id', roomId)
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (!existingMembership) {
+            await supabase
+              .from('room_users')
+              .insert([
+                {
+                  room_id: roomId,
+                  user_id: session.user.id
+                }
+              ]);
+          }
+        } else {
+          // Oda bulunamadıysa ana sayfaya dön
+          onLeaveRoom();
+          return;
         }
-      }
 
-      // Fetch room users
-      const { data: roomUsersData, error: roomUsersError } = await supabase
-        .from('room_users')
-        .select('user_id')
-        .eq('room_id', roomId);
+        // Fetch room users
+        const { data: roomUsersData, error: roomUsersError } = await supabase
+          .from('room_users')
+          .select('user_id')
+          .eq('room_id', roomId);
 
-      if (roomUsersError) {
-        console.error('Error fetching room users:', roomUsersError);
-        setIsLoading(false);
-        return;
-      }
+        if (roomUsersError) {
+          console.error('Error fetching room users:', roomUsersError);
+          setIsLoading(false);
+          return;
+        }
 
-      if (!roomUsersData?.length) {
-        setRoomUsers([]);
-        setIsLoading(false);
-        return;
-      }
+        if (!roomUsersData?.length) {
+          setRoomUsers([]);
+          setIsLoading(false);
+          return;
+        }
 
-      const { data: userData, error: userError } = await supabase
-        .rpc('get_user_emails', {
-          user_ids: roomUsersData.map(u => u.user_id)
+        const { data: userData, error: userError } = await supabase
+          .rpc('get_user_emails', {
+            user_ids: roomUsersData.map(u => u.user_id)
+          });
+
+        if (userError) {
+          console.error('Error fetching user data:', userError);
+          setIsLoading(false);
+          return;
+        }
+
+        // Kullanıcıların profil fotoğraflarını getir
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, avatar_url')
+          .in('id', roomUsersData.map(u => u.user_id));
+
+        // Kullanıcıların isim-soyisim bilgilerini getir
+        const { data: namesData } = await supabase
+          .from('users_fullname')
+          .select('id, first_name, last_name')
+          .in('id', roomUsersData.map(u => u.user_id));
+
+        // Sort users so owner is always first
+        const users = roomUsersData.map(roomUser => {
+          const user = userData?.find((u: { id: string }) => u.id === roomUser.user_id);
+          const profile = profilesData?.find(p => p.id === roomUser.user_id);
+          const nameInfo = namesData?.find(n => n.id === roomUser.user_id);
+          
+          return {
+            user_id: roomUser.user_id,
+            user_email: user?.email || 'Unknown User',
+            avatar_url: profile?.avatar_url || null,
+            first_name: nameInfo?.first_name || null,
+            last_name: nameInfo?.last_name || null
+          };
+        }).sort((a, b) => {
+          if (a.user_id === roomData?.owner_id) return -1;
+          if (b.user_id === roomData?.owner_id) return 1;
+          return 0;
         });
 
-      if (userError) {
-        console.error('Error fetching user data:', userError);
+        setRoomUsers(users);
         setIsLoading(false);
-        return;
+      } catch (error) {
+        console.error('Error fetching room details:', error);
+        onLeaveRoom();
       }
-
-      // Kullanıcıların profil fotoğraflarını getir
-      const { data: profilesData } = await supabase
-        .from('profiles')
-        .select('id, avatar_url')
-        .in('id', roomUsersData.map(u => u.user_id));
-
-      // Kullanıcıların isim-soyisim bilgilerini getir
-      const { data: namesData } = await supabase
-        .from('users_fullname')
-        .select('id, first_name, last_name')
-        .in('id', roomUsersData.map(u => u.user_id));
-
-      // Sort users so owner is always first
-      const users = roomUsersData.map(roomUser => {
-        const user = userData?.find((u: { id: string }) => u.id === roomUser.user_id);
-        const profile = profilesData?.find(p => p.id === roomUser.user_id);
-        const nameInfo = namesData?.find(n => n.id === roomUser.user_id);
-        
-        return {
-          user_id: roomUser.user_id,
-          user_email: user?.email || 'Unknown User',
-          avatar_url: profile?.avatar_url || null,
-          first_name: nameInfo?.first_name || null,
-          last_name: nameInfo?.last_name || null
-        };
-      }).sort((a, b) => {
-        if (a.user_id === roomData?.owner_id) return -1;
-        if (b.user_id === roomData?.owner_id) return 1;
-        return 0;
-      });
-
-      setRoomUsers(users);
-      setIsLoading(false);
     };
 
     fetchRoomDetails();
@@ -141,12 +170,14 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
           filter: `room_id=eq.${roomId}`
         },
         (payload) => {
-          // Silinen kullanıcı için payload.old nesnesini kullan
           if (payload.old && 'user_id' in payload.old) {
             const deletedUserId = payload.old.user_id;
-            console.log('Kullanıcı odadan çıkarıldı:', deletedUserId);
-            
-            // Eğer silinen kullanıcı yerel kullanıcı listesindeyse, listeden kaldır
+            // Eğer silinen kullanıcı kendisiyse odadan çık
+            if (deletedUserId === session.user.id) {
+              onLeaveRoom();
+              return;
+            }
+            // Diğer kullanıcılar için listeyi güncelle
             setRoomUsers(current => 
               current.filter(user => user.user_id !== deletedUserId)
             );
@@ -184,7 +215,7 @@ export default function RoomView({ session, roomId }: RoomViewProps) {
     return () => {
       channel.unsubscribe();
     };
-  }, [roomId, session.user.id]);
+  }, [roomId, session.user.id, onLeaveRoom]);
 
   useEffect(() => {
     checkProStatus();

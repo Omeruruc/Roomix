@@ -20,11 +20,56 @@ function App() {
   const [showAuth, setShowAuth] = useState(false);
   const [roomType, setRoomType] = useState<'study' | 'watch'>('study');
 
+  // Sayfa ilk yüklendiğinde localStorage'dan oda bilgisini al
   useEffect(() => {
-    if (!session && selectedRoomId) {
-      setSelectedRoomId(null);
+    const savedRoomId = localStorage.getItem('selectedRoomId');
+    if (savedRoomId && session) {
+      // Odanın hala var olup olmadığını kontrol et
+      const checkRoom = async () => {
+        const { data: roomExists } = await supabase
+          .from('rooms')
+          .select('id')
+          .eq('id', savedRoomId)
+          .single();
+
+        if (roomExists) {
+          setSelectedRoomId(savedRoomId);
+        } else {
+          localStorage.removeItem('selectedRoomId');
+        }
+      };
+      
+      checkRoom();
     }
   }, [session]);
+
+  // Kullanıcı odaya katıldığında veya odadan çıktığında localStorage'ı güncelle
+  const handleRoomSelect = async (roomId: string | null) => {
+    if (roomId) {
+      localStorage.setItem('selectedRoomId', roomId);
+      setSelectedRoomId(roomId);
+    } else {
+      localStorage.removeItem('selectedRoomId');
+      setSelectedRoomId(null);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      if (session) {
+        await supabase
+          .from('room_users')
+          .delete()
+          .eq('user_id', session.user.id);
+      }
+      
+      localStorage.removeItem('selectedRoomId');
+      setSelectedRoomId(null);
+      await signOut();
+    } catch (error) {
+      console.error('Error during sign out:', error);
+    }
+  };
 
   // Fetch room type when selected room changes
   useEffect(() => {
@@ -44,22 +89,6 @@ function App() {
       fetchRoomType();
     }
   }, [selectedRoomId]);
-
-  const handleSignOut = async () => {
-    try {
-      if (session) {
-        await supabase
-          .from('room_users')
-          .delete()
-          .eq('user_id', session.user.id);
-      }
-      
-      await signOut();
-      setSelectedRoomId(null);
-    } catch (error) {
-      console.error('Error during sign out:', error);
-    }
-  };
 
   if (!session && !showAuth) {
     return <LandingPage onAuthClick={() => setShowAuth(true)} />;
@@ -101,7 +130,7 @@ function App() {
                         .eq('user_id', session.user.id)
                         .eq('room_id', selectedRoomId);
 
-                      setSelectedRoomId(null);
+                      handleRoomSelect(null);
                     } catch (error) {
                       console.error('Error leaving room:', error);
                     }
@@ -138,9 +167,9 @@ function App() {
 
           <main className={`rounded-2xl overflow-hidden shadow-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
             {selectedRoomId ? (
-              <RoomView session={session} roomId={selectedRoomId} />
+              <RoomView session={session} roomId={selectedRoomId} onLeaveRoom={() => handleRoomSelect(null)} />
             ) : (
-              <RoomList session={session} onRoomSelect={setSelectedRoomId} />
+              <RoomList session={session} onRoomSelect={handleRoomSelect} />
             )}
           </main>
         </div>
