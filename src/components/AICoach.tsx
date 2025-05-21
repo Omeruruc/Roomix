@@ -125,6 +125,9 @@ export default function AICoach({ session, onClose }: AICoachProps) {
         return;
       }
 
+      // Gemini servisindeki geçmişi temizle
+      geminiService.clearHistory(session.user.id);
+
       // Welcome mesajını göster
       const welcomeMessage = {
         id: `ai-welcome-${Date.now()}`,
@@ -182,6 +185,7 @@ export default function AICoach({ session, onClose }: AICoachProps) {
       
       // Gemini API'yi kullanarak AI yanıtı al
       const response = await geminiService.generateResponse(
+        session.user.id,
         `Sen bir eğitim koçusun. Öğrencilere çalışma teknikleri, motivasyon, zaman yönetimi ve akademik başarı konularında yardımcı oluyorsun. Yanıtlarını Türkçe olarak ver ve samimi bir dil kullan. Kullanıcının sorusu: ${userMessage}`
       );
       

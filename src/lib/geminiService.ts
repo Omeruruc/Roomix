@@ -12,58 +12,96 @@ interface ChatMessage {
 
 class GeminiService {
   private ai: GoogleGenAI;
-  private chatHistory: ChatMessage[] = [];
+  private chatHistories: Map<string, ChatMessage[]> = new Map(); // userId -> messages
 
   constructor() {
     this.ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-    this.loadHistory();
+    this.loadAllHistories();
   }
 
-  private loadHistory() {
+  private getStorageKey(userId: string): string {
+    return `geminiChatHistory_${userId}`;
+  }
+
+  private loadAllHistories() {
     try {
-      const savedHistory = localStorage.getItem('geminiChatHistory');
+      // Tüm localStorage anahtarlarını kontrol et
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('geminiChatHistory_')) {
+          const userId = key.replace('geminiChatHistory_', '');
+          const savedHistory = localStorage.getItem(key);
+          if (savedHistory) {
+            const parsedHistory = JSON.parse(savedHistory) as ChatMessage[];
+            // Son 1 haftalık mesajları filtrele
+            const oneWeekAgo = Date.now() - (HISTORY_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+            const filteredHistory = parsedHistory.filter(msg => msg.timestamp > oneWeekAgo);
+            this.chatHistories.set(userId, filteredHistory);
+            // Filtrelenmiş geçmişi kaydet
+            this.saveHistory(userId);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Geçmişler yüklenirken hata:', error);
+    }
+  }
+
+  private loadHistory(userId: string) {
+    try {
+      const savedHistory = localStorage.getItem(this.getStorageKey(userId));
       if (savedHistory) {
         const parsedHistory = JSON.parse(savedHistory) as ChatMessage[];
         // Son 1 haftalık mesajları filtrele
         const oneWeekAgo = Date.now() - (HISTORY_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
-        this.chatHistory = parsedHistory.filter(msg => msg.timestamp > oneWeekAgo);
-        this.saveHistory(); // Filtrelenmiş geçmişi kaydet
+        const filteredHistory = parsedHistory.filter(msg => msg.timestamp > oneWeekAgo);
+        this.chatHistories.set(userId, filteredHistory);
+        // Filtrelenmiş geçmişi kaydet
+        this.saveHistory(userId);
+      } else {
+        this.chatHistories.set(userId, []);
       }
     } catch (error) {
       console.error('Geçmiş yüklenirken hata:', error);
-      this.chatHistory = [];
+      this.chatHistories.set(userId, []);
     }
   }
 
-  private saveHistory() {
+  private saveHistory(userId: string) {
     try {
-      localStorage.setItem('geminiChatHistory', JSON.stringify(this.chatHistory));
+      const history = this.chatHistories.get(userId) || [];
+      localStorage.setItem(this.getStorageKey(userId), JSON.stringify(history));
     } catch (error) {
       console.error('Geçmiş kaydedilirken hata:', error);
     }
   }
 
-  private formatChatHistory(): string {
+  private formatChatHistory(userId: string): string {
+    const history = this.chatHistories.get(userId) || [];
     // Son 1 haftalık mesajları filtrele
     const oneWeekAgo = Date.now() - (HISTORY_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
-    const recentMessages = this.chatHistory.filter(msg => msg.timestamp > oneWeekAgo);
+    const recentMessages = history.filter(msg => msg.timestamp > oneWeekAgo);
     
     return recentMessages
       .map(msg => `${msg.role === 'user' ? 'Kullanıcı' : 'Asistan'}: ${msg.content}`)
       .join('\n');
   }
 
-  async generateResponse(prompt: string): Promise<string> {
+  async generateResponse(userId: string, prompt: string): Promise<string> {
     try {
+      // Kullanıcının geçmişini yükle
+      this.loadHistory(userId);
+      const history = this.chatHistories.get(userId) || [];
+
       // Kullanıcı mesajını geçmişe ekle
-      this.chatHistory.push({
+      history.push({
         role: 'user',
         content: prompt,
         timestamp: Date.now()
       });
 
       // Tüm sohbet geçmişini içeren prompt oluştur
-      const fullPrompt = `Önceki konuşma geçmişi (son 1 hafta):\n${this.formatChatHistory()}\n\nYeni kullanıcı mesajı: ${prompt}\n\nLütfen yukarıdaki konuşma geçmişini dikkate alarak yanıt ver.`;
+      const fullPrompt = `Önceki konuşma geçmişi (son 1 hafta):\n${this.formatChatHistory(userId)}\n\nYeni kullanıcı mesajı: ${prompt}\n\nLütfen yukarıdaki konuşma geçmişini dikkate alarak yanıt ver.`;
 
       const response = await this.ai.models.generateContent({
         model: GEMINI_MODEL,
@@ -73,14 +111,14 @@ class GeminiService {
       const responseText = response.text || '';
       
       // Model yanıtını geçmişe ekle
-      this.chatHistory.push({
+      history.push({
         role: 'model',
         content: responseText,
         timestamp: Date.now()
       });
 
       // Geçmişi kaydet
-      this.saveHistory();
+      this.saveHistory(userId);
 
       return responseText;
     } catch (error) {
@@ -89,17 +127,21 @@ class GeminiService {
     }
   }
 
-  async generateStreamingResponse(prompt: string, onChunk: (text: string) => void): Promise<void> {
+  async generateStreamingResponse(userId: string, prompt: string, onChunk: (text: string) => void): Promise<void> {
     try {
+      // Kullanıcının geçmişini yükle
+      this.loadHistory(userId);
+      const history = this.chatHistories.get(userId) || [];
+
       // Kullanıcı mesajını geçmişe ekle
-      this.chatHistory.push({
+      history.push({
         role: 'user',
         content: prompt,
         timestamp: Date.now()
       });
 
       // Tüm sohbet geçmişini içeren prompt oluştur
-      const fullPrompt = `Önceki konuşma geçmişi (son 1 hafta):\n${this.formatChatHistory()}\n\nYeni kullanıcı mesajı: ${prompt}\n\nLütfen yukarıdaki konuşma geçmişini dikkate alarak yanıt ver.`;
+      const fullPrompt = `Önceki konuşma geçmişi (son 1 hafta):\n${this.formatChatHistory(userId)}\n\nYeni kullanıcı mesajı: ${prompt}\n\nLütfen yukarıdaki konuşma geçmişini dikkate alarak yanıt ver.`;
 
       const response = await this.ai.models.generateContentStream({
         model: GEMINI_MODEL,
@@ -114,14 +156,14 @@ class GeminiService {
       }
 
       // Tam yanıtı geçmişe ekle
-      this.chatHistory.push({
+      history.push({
         role: 'model',
         content: fullResponse,
         timestamp: Date.now()
       });
 
       // Geçmişi kaydet
-      this.saveHistory();
+      this.saveHistory(userId);
     } catch (error) {
       console.error('Gemini API Stream Hatası:', error);
       throw error;
@@ -129,16 +171,18 @@ class GeminiService {
   }
 
   // Sohbet geçmişini temizle
-  clearHistory(): void {
-    this.chatHistory = [];
-    this.saveHistory();
+  clearHistory(userId: string): void {
+    this.chatHistories.set(userId, []);
+    this.saveHistory(userId);
   }
 
   // Sohbet geçmişini al
-  getHistory(): ChatMessage[] {
+  getHistory(userId: string): ChatMessage[] {
+    this.loadHistory(userId);
+    const history = this.chatHistories.get(userId) || [];
     // Son 1 haftalık mesajları filtrele
     const oneWeekAgo = Date.now() - (HISTORY_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
-    return this.chatHistory.filter(msg => msg.timestamp > oneWeekAgo);
+    return history.filter(msg => msg.timestamp > oneWeekAgo);
   }
 }
 
