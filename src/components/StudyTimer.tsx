@@ -34,7 +34,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
   const timerRef = useRef<NodeJS.Timeout>();
   const localTimeRef = useRef<number>(0);
   const lastSyncTimeRef = useRef<number>(0);
-
+  
   // Server'a timer durumunu güncelleyen fonksiyon
   const updateServerTimer = async (elapsedTime: number, isRunning: boolean, forceUpdate: boolean = false) => {
     const now = Date.now();
@@ -179,7 +179,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
               const timeDiff = Math.floor((now - lastUpdate) / 1000);
               elapsedTime += timeDiff;
             }
-
+            
             setTimerState({
               isRunning: Boolean(newData.is_running),
               time: elapsedTime,

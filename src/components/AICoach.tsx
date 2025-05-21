@@ -5,12 +5,7 @@ import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { useTheme } from '../contexts/ThemeContext';
-import { fal } from '@fal-ai/client';
-
-// Fal.ai API anahtarını yapılandır
-fal.config({
-  credentials: "62ff12a0-45e4-4e1d-8923-22cefbd8bbb0:e5fb106f5ff6ff70de5712dd540abf5e"
-});
+import { geminiService } from '../lib/geminiService';
 
 interface Message {
   id: string;
@@ -18,7 +13,7 @@ interface Message {
   content: string;
   user_id: string;
   is_ai: boolean;
-  avatar_url?: string | null;
+  avatar_url: string | null;
 }
 
 interface AICoachProps {
@@ -31,9 +26,11 @@ export default function AICoach({ session, onClose }: AICoachProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const [avatar, setAvatar] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout>();
   
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -53,7 +50,41 @@ export default function AICoach({ session, onClose }: AICoachProps) {
       is_ai: true,
       avatar_url: null
     };
-    setMessages([welcomeMessage]);
+
+    // Önceki mesajları getir
+    const fetchMessages = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('ai_chats')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.error('Mesajlar getirilemedi:', error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          const formattedMessages = data.map(msg => ({
+            id: msg.id,
+            created_at: msg.created_at,
+            content: msg.content,
+            user_id: msg.is_ai ? 'ai-coach' : session.user.id,
+            is_ai: msg.is_ai,
+            avatar_url: msg.is_ai ? null : avatar
+          }));
+          setMessages([welcomeMessage, ...formattedMessages]);
+        } else {
+          setMessages([welcomeMessage]);
+        }
+      } catch (error) {
+        console.error('Mesajlar alınamadı:', error);
+        setMessages([welcomeMessage]);
+      }
+    };
+
+    fetchMessages();
 
     // Kullanıcının profil fotoğrafını getir
     const fetchUserAvatar = async () => {
@@ -78,66 +109,67 @@ export default function AICoach({ session, onClose }: AICoachProps) {
     };
     
     fetchUserAvatar();
-    
-    // Kullanıcıya özel AI sohbetlerini getir
-    const fetchAIChats = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('ai_chats')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .order('created_at', { ascending: true });
-          
-        if (error) {
-          console.error('AI sohbetleri getirilemedi:', error);
-          return;
-        }
-        
-        if (data && data.length > 0) {
-          const formattedMessages = data.map(chat => ({
-            id: chat.id,
-            created_at: chat.created_at,
-            content: chat.content,
-            user_id: chat.is_ai ? 'ai-coach' : session.user.id,
-            is_ai: chat.is_ai,
-            avatar_url: null
-          }));
-          
-          setMessages([welcomeMessage, ...formattedMessages]);
-        }
-      } catch (error) {
-        console.error('AI sohbetleri alınamadı:', error);
-      }
-    };
-    
-    fetchAIChats();
   }, [session.user.id]);
+
+  const clearConversation = async () => {
+    try {
+      // Veritabanındaki mesajları sil
+      const { error } = await supabase
+        .from('ai_chats')
+        .delete()
+        .eq('user_id', session.user.id);
+
+      if (error) {
+        console.error('Mesajlar silinemedi:', error);
+        toast.error('Mesajlar silinemedi');
+        return;
+      }
+
+      // Welcome mesajını göster
+      const welcomeMessage = {
+        id: `ai-welcome-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        content: "Merhaba! Ben senin AI eğitim koçunum. Çalışmalarında yardımcı olmak için buradayım. Herhangi bir sorun veya yardıma ihtiyacın olduğunda bana sorabilirsin.",
+        user_id: 'ai-coach',
+        is_ai: true,
+        avatar_url: null
+      };
+      setMessages([welcomeMessage]);
+      toast.success('Konuşma geçmişi temizlendi');
+    } catch (error) {
+      console.error('Konuşma temizlenirken hata:', error);
+      toast.error('Konuşma temizlenemedi');
+    }
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || isLoading) return;
+
+    const userMessage = newMessage.trim();
+    setNewMessage('');
+    
+    // Kullanıcı mesajını ekle
+    const userMessageObj = {
+      id: `user-${Date.now()}`,
+      created_at: new Date().toISOString(),
+      content: userMessage,
+      user_id: session.user.id,
+      is_ai: false,
+      avatar_url: avatar
+    };
+    
+    setMessages(prev => [...prev, userMessageObj]);
+    setIsLoading(true);
+    setIsTyping(true);
 
     try {
-      // Kullanıcı mesajını ekle
-      const userMessage = {
-        id: `user-${Date.now()}`,
-        created_at: new Date().toISOString(),
-        content: newMessage,
-        user_id: session.user.id,
-        is_ai: false,
-        avatar_url: avatar
-      };
-      
-      setMessages(prev => [...prev, userMessage]);
-      setNewMessage('');
-      setIsLoading(true);
-      
       // Kullanıcı mesajını veritabanına kaydet
       const { error: userMessageError } = await supabase
         .from('ai_chats')
         .insert([
           {
-            content: newMessage,
+            content: userMessage,
             user_id: session.user.id,
             is_ai: false
           }
@@ -145,99 +177,93 @@ export default function AICoach({ session, onClose }: AICoachProps) {
         
       if (userMessageError) {
         console.error('Kullanıcı mesajı kaydedilemedi:', userMessageError);
+        throw new Error('Kullanıcı mesajı kaydedilemedi');
       }
       
-      // Fal.ai API'sini kullanarak AI yanıtı al
-      try {
-        const result = await fal.subscribe("fal-ai/any-llm", {
-          input: {
-            model: "google/gemini-flash-1.5",
-            prompt: newMessage,
-            system_prompt: "Sen bir eğitim koçusun. Öğrencilere çalışma teknikleri, motivasyon, zaman yönetimi ve akademik başarı konularında yardımcı oluyorsun. Yanıtlarını Türkçe olarak ver ve samimi bir dil kullan."
-          },
-          logs: true,
-          onQueueUpdate: (update) => {
-            if (update.status === "IN_PROGRESS") {
-              console.log("AI yanıtı hazırlanıyor...");
-            }
-          },
-        });
-
-        const aiResponse = result.data.output;
-        
-        // AI cevabını oluştur
-        const aiMessageResponse = {
-          id: `ai-${Date.now()}`,
-          created_at: new Date().toISOString(),
-          content: aiResponse,
-          user_id: 'ai-coach',
-          is_ai: true,
-          avatar_url: null
-        };
-        
-        setMessages(prev => [...prev, aiMessageResponse]);
-        
-        // AI cevabını veritabanına kaydet
-        const { error: aiMessageError } = await supabase
-          .from('ai_chats')
-          .insert([
-            {
-              content: aiResponse,
-              user_id: session.user.id,
-              is_ai: true
-            }
-          ]);
-          
-        if (aiMessageError) {
-          console.error('AI mesajı kaydedilemedi:', aiMessageError);
-        }
-      } catch (aiError) {
-        console.error('AI yanıtı alınamadı:', aiError);
-        toast.error('AI yanıtı alınamadı. Lütfen tekrar deneyin.');
-      } finally {
-        setIsLoading(false);
-      }
+      // Gemini API'yi kullanarak AI yanıtı al
+      const response = await geminiService.generateResponse(
+        `Sen bir eğitim koçusun. Öğrencilere çalışma teknikleri, motivasyon, zaman yönetimi ve akademik başarı konularında yardımcı oluyorsun. Yanıtlarını Türkçe olarak ver ve samimi bir dil kullan. Kullanıcının sorusu: ${userMessage}`
+      );
       
-    } catch (error) {
-      setIsLoading(false);
-      if (error instanceof Error) {
-        toast.error(error.message);
-      }
-    }
-  };
-  
-  const clearConversation = async () => {
-    try {
-      // Kullanıcıya özel AI sohbetlerini sil
-      const { error } = await supabase
-        .from('ai_chats')
-        .delete()
-        .eq('user_id', session.user.id);
-        
-      if (error) {
-        console.error('Sohbet geçmişi silinemedi:', error);
-        toast.error('Sohbet geçmişi silinemedi');
-        return;
-      }
+      // Yazıyor animasyonunu kaldır
+      setIsTyping(false);
       
-      // Welcome mesajını tekrar göster
-      const welcomeMessage = {
-        id: `ai-welcome-${Date.now()}`,
+      // AI cevabını oluştur
+      const aiMessageResponse = {
+        id: `ai-${Date.now()}`,
         created_at: new Date().toISOString(),
-        content: "Konuşma geçmişi temizlendi. Yeni bir konuşmaya başlayabilirsin!",
+        content: response,
         user_id: 'ai-coach',
         is_ai: true,
         avatar_url: null
       };
       
-      setMessages([welcomeMessage]);
-      toast.success('Sohbet geçmişi temizlendi');
-    } catch (error) {
-      if (error instanceof Error) {
-        toast.error(error.message);
+      setMessages(prev => [...prev, aiMessageResponse]);
+      
+      // AI cevabını veritabanına kaydet
+      const { error: aiMessageError } = await supabase
+        .from('ai_chats')
+        .insert([
+          {
+            content: response,
+            user_id: session.user.id,
+            is_ai: true
+          }
+        ]);
+        
+      if (aiMessageError) {
+        console.error('AI mesajı kaydedilemedi:', aiMessageError);
+        throw new Error('AI mesajı kaydedilemedi');
       }
+    } catch (error) {
+      console.error('Mesaj gönderme hatası:', error);
+      toast.error('Mesaj gönderilemedi. Lütfen tekrar deneyin.');
+      setIsTyping(false);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  // Yazıyor animasyonu bileşeni
+  const TypingIndicator = () => (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      className={`flex items-center space-x-2 p-3 rounded-lg ${
+        theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+      }`}
+    >
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+        theme === 'dark' ? 'bg-violet-600' : 'bg-violet-500'
+      }`}>
+        <BrainCircuit className="w-4 h-4 text-white" />
+      </div>
+      <div className="flex space-x-1">
+        <motion.div
+          animate={{ y: [0, -4, 0] }}
+          transition={{ repeat: Infinity, duration: 0.6 }}
+          className={`w-2 h-2 rounded-full ${
+            theme === 'dark' ? 'bg-gray-400' : 'bg-gray-500'
+          }`}
+        />
+        <motion.div
+          animate={{ y: [0, -4, 0] }}
+          transition={{ repeat: Infinity, duration: 0.6, delay: 0.2 }}
+          className={`w-2 h-2 rounded-full ${
+            theme === 'dark' ? 'bg-gray-400' : 'bg-gray-500'
+          }`}
+        />
+        <motion.div
+          animate={{ y: [0, -4, 0] }}
+          transition={{ repeat: Infinity, duration: 0.6, delay: 0.4 }}
+          className={`w-2 h-2 rounded-full ${
+            theme === 'dark' ? 'bg-gray-400' : 'bg-gray-500'
+          }`}
+        />
+      </div>
+    </motion.div>
+  );
 
   return (
     <motion.div
@@ -303,106 +329,82 @@ export default function AICoach({ session, onClose }: AICoachProps) {
             theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
           }`}
         >
-          <AnimatePresence>
-            {messages.map((message) => (
+          {messages.map((message) => (
+            <motion.div
+              key={message.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`flex items-start gap-3 ${
+                message.is_ai ? 'justify-start' : 'justify-end'
+              }`}
+            >
+              {message.is_ai && (
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  theme === 'dark' 
+                    ? 'bg-violet-600 text-white' 
+                    : 'bg-violet-500 text-white'
+                }`}>
+                  <BrainCircuit className="w-4 h-4" />
+                </div>
+              )}
+              
               <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.3 }}
-                className={`flex ${
-                  !message.is_ai ? 'justify-end' : 'justify-start'
+                whileHover={{ scale: 1.02 }}
+                className={`max-w-[80%] rounded-2xl p-4 shadow-md ${
+                  !message.is_ai
+                    ? theme === 'dark'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-blue-500 text-white'
+                    : theme === 'dark'
+                      ? 'bg-violet-600/80 text-white'
+                      : 'bg-violet-100 text-gray-900'
                 }`}
               >
-                {message.is_ai && (
-                  <div className="flex-shrink-0 mr-2">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md bg-violet-500`}>
-                      <BrainCircuit className="w-4 h-4 text-white" />
+                <p className={`text-sm font-medium mb-1 flex flex-wrap items-center justify-between ${
+                  theme === 'dark' ? 'opacity-80' : 'opacity-70'
+                }`}>
+                  <span className="truncate mr-2">
+                    {message.is_ai ? 'Eğitim Koçu' : 'Sen'}
+                  </span>
+                  <span className="text-xs opacity-70 whitespace-nowrap">
+                    {new Date(message.created_at).toLocaleTimeString('tr-TR', { 
+                      hour: '2-digit', 
+                      minute: '2-digit' 
+                    })}
+                  </span>
+                </p>
+                
+                <p className="break-words whitespace-pre-line">{message.content}</p>
+              </motion.div>
+              
+              {!message.is_ai && (
+                <div className="flex-shrink-0 ml-2">
+                  {avatar ? (
+                    <div className="w-8 h-8 rounded-full overflow-hidden shadow-md">
+                      <img
+                        src={avatar}
+                        alt="Kullanıcı"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                  </div>
-                )}
-                
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  className={`max-w-[80%] rounded-2xl p-4 shadow-md ${
-                    !message.is_ai
-                      ? theme === 'dark'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-blue-500 text-white'
-                      : theme === 'dark'
-                        ? 'bg-violet-600/80 text-white'
-                        : 'bg-violet-100 text-gray-900'
-                  }`}
-                >
-                  <p className={`text-sm font-medium mb-1 flex flex-wrap items-center justify-between ${
-                    theme === 'dark' ? 'opacity-80' : 'opacity-70'
-                  }`}>
-                    <span className="truncate mr-2">
-                      {message.is_ai ? 'Eğitim Koçu' : 'Sen'}
-                    </span>
-                    <span className="text-xs opacity-70 whitespace-nowrap">
-                      {new Date(message.created_at).toLocaleTimeString('tr-TR', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </span>
-                  </p>
-                  
-                  <p className="break-words whitespace-pre-line">{message.content}</p>
-                </motion.div>
-                
-                {!message.is_ai && (
-                  <div className="flex-shrink-0 ml-2">
-                    {avatar ? (
-                      <div className="w-8 h-8 rounded-full overflow-hidden shadow-md">
-                        <img
-                          src={avatar}
-                          alt="Kullanıcı"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md ${
-                        theme === 'dark' 
-                          ? 'bg-gray-700' 
-                          : 'bg-gray-100'
-                      }`}>
-                        <User className="w-4 h-4 text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            ))}
-            
-            {isLoading && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex justify-start"
-              >
-                <div className="flex-shrink-0 mr-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md bg-violet-500`}>
-                    <BrainCircuit className="w-4 h-4 text-white" />
-                  </div>
+                  ) : (
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-md ${
+                      theme === 'dark' 
+                        ? 'bg-gray-700' 
+                        : 'bg-gray-100'
+                    }`}>
+                      <User className="w-4 h-4 text-gray-400" />
+                    </div>
+                  )}
                 </div>
-                
-                <div className={`rounded-2xl p-4 shadow-md max-w-[80%] ${
-                  theme === 'dark'
-                    ? 'bg-violet-600/80 text-white'
-                    : 'bg-violet-100 text-gray-900'
-                }`}
-                >
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 rounded-full bg-white animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 rounded-full bg-white animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 rounded-full bg-white animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
+              )}
+            </motion.div>
+          ))}
+          
+          <AnimatePresence>
+            {isTyping && <TypingIndicator />}
           </AnimatePresence>
+          
           <div ref={messagesEndRef} />
         </div>
         
