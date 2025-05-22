@@ -344,33 +344,33 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
         } backdrop-blur-lg rounded-2xl shadow-2xl p-6`}>
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
-          <h2 className={`text-2xl font-bold ${
+          <h2 className={`text-xl font-bold ${
             theme === 'dark'
               ? 'bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text'
               : 'text-blue-600'
           }`}>
             Chat Rooms
           </h2>
+          {isPro && (
+            <span className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full text-white text-sm">
+              <Crown className="w-3.5 h-3.5" />
+              PRO
+            </span>
+          )}
           </div>
           <div className="flex items-center gap-3">
-            {isPro && (
-              <span className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full text-white text-sm">
-                <Crown className="w-4 h-4" />
-                PRO
-              </span>
-            )}
             {!isPro && (
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setShowProModal(true)}
-                className={`px-4 py-2 ${
+                className={`px-3 py-1.5 ${
                   theme === 'dark'
                     ? 'bg-gradient-to-r from-yellow-500 to-orange-500 shadow-yellow-500/30 hover:shadow-yellow-500/50'
                     : 'bg-yellow-500 hover:bg-yellow-600 shadow-yellow-500/30 hover:shadow-yellow-500/50'
-                } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
+                } rounded-xl text-white text-sm font-semibold shadow-lg transition-all duration-200 flex items-center gap-1.5`}
               >
-                <Sparkles className="w-5 h-5" />
+                <Sparkles className="w-4 h-4" />
                 Pro'ya Yükselt
               </motion.button>
             )}
@@ -379,58 +379,60 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setCreateRoomMode(true)}
-              className={`px-4 py-2 ${
+              className={`px-3.5 py-2 ${
                 theme === 'dark'
                   ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
                   : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
-              } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
+              } rounded-xl text-white text-sm font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
               Create Room
             </motion.button>
           ) : (
-            <div className="flex gap-3">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setRoomType('study');
-                  setShowCreateModal(true);
-                }}
-                className={`px-4 py-2 ${
-                  theme === 'dark'
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
-                    : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
-                } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
-              >
-                <BookOpen className="w-5 h-5" />
-                Study Room
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => {
-                  setRoomType('watch');
-                  setShowCreateModal(true);
-                }}
-                className={`px-4 py-2 ${
-                  theme === 'dark'
-                    ? 'bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/30 hover:shadow-orange-500/50'
-                    : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30 hover:shadow-orange-500/50'
-                } rounded-xl text-white font-semibold shadow-lg transition-all duration-200 flex items-center gap-2`}
-              >
-                <Video className="w-5 h-5" />
-                Watch Room
-              </motion.button>
+            <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setRoomType('study');
+                    setShowCreateModal(true);
+                  }}
+                  className={`px-2.5 py-1 ${
+                    theme === 'dark'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 shadow-blue-500/30 hover:shadow-blue-500/50'
+                      : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 hover:shadow-blue-600/50'
+                  } rounded-xl text-white text-xs font-semibold shadow-lg transition-all duration-200 flex items-center gap-1`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  Study Room
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setRoomType('watch');
+                    setShowCreateModal(true);
+                  }}
+                  className={`px-2.5 py-1 ${
+                    theme === 'dark'
+                      ? 'bg-gradient-to-r from-orange-500 to-red-600 shadow-orange-500/30 hover:shadow-orange-500/50'
+                      : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30 hover:shadow-orange-500/50'
+                  } rounded-xl text-white text-xs font-semibold shadow-lg transition-all duration-200 flex items-center gap-1`}
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  Watch Room
+                </motion.button>
+              </div>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setCreateRoomMode(false)}
-                className={`px-4 py-2 ${
+                className={`px-3 py-1.5 ${
                   theme === 'dark'
                     ? 'bg-gray-700 hover:bg-gray-600'
                     : 'bg-gray-200 hover:bg-gray-300'
-                } rounded-xl transition-colors`}
+                } rounded-xl text-sm transition-colors`}
               >
                 Cancel
               </motion.button>

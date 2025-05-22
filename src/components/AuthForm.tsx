@@ -117,12 +117,13 @@ export default function AuthForm({ setIsLoading, onBack }: AuthFormProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" translate="no">
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage: 'url(https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=2940&auto=format&fit=crop)',
-          filter: 'brightness(0.2)'
+          filter: 'brightness(0.2)',
+          transform: 'translateZ(0)'
         }}
       />
 
@@ -189,6 +190,11 @@ export default function AuthForm({ setIsLoading, onBack }: AuthFormProps) {
               ? 'bg-white/10 border-white/20'
               : 'bg-white/80 border-gray-200'
           } p-8 rounded-2xl shadow-2xl border`}
+          style={{
+            transform: 'translateZ(0)',
+            willChange: 'transform'
+          }}
+          translate="no"
         >
           <div className="relative mb-8">
             <div className="relative w-32 h-32 mx-auto">
