@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Clock, Users, MessageSquare, ArrowRight, BookOpen, Target, Coffee, Sparkles, Video, PlayCircle, Timer, BrainCircuit } from 'lucide-react';
+import AdComponent from './AdComponent';
 
 interface LandingPageProps {
   onAuthClick: () => void;
@@ -44,8 +45,13 @@ export default function LandingPage({ onAuthClick }: LandingPageProps) {
         </div>
       </header>
 
+      {/* Header Ad */}
+      <div className="w-full px-4 pt-20 pb-8">
+        <AdComponent type="header" />
+      </div>
+
       {/* Hero Section */}
-      <section className="relative pt-36 pb-20">
+      <section className="relative pt-8">
         <div className="container mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -135,7 +141,7 @@ export default function LandingPage({ onAuthClick }: LandingPageProps) {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 border-y border-white/10">
+      <section className="py-16">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <motion.div
@@ -191,8 +197,13 @@ export default function LandingPage({ onAuthClick }: LandingPageProps) {
         </div>
       </section>
 
+      {/* Middle Ad */}
+      <div className="w-full px-4 py-8">
+        <AdComponent type="content" />
+      </div>
+
       {/* How It Works Section */}
-      <section className="py-20">
+      <section className="py-16">
         <div className="container mx-auto px-4">
           <motion.h2
             initial={{ opacity: 0, y: 20 }}
@@ -270,8 +281,13 @@ export default function LandingPage({ onAuthClick }: LandingPageProps) {
         </div>
       </section>
 
+      {/* Bottom Ad */}
+      <div className="w-full px-4 py-8">
+        <AdComponent type="content" />
+      </div>
+
       {/* CTA Section */}
-      <section className="py-20 border-t border-white/10">
+      <section className="py-16">
         <div className="container mx-auto px-4 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}

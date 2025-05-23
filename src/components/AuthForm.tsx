@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { Mail, Lock, LogIn, UserPlus, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
+import AdComponent from './AdComponent';
 
 interface AuthFormProps {
   setIsLoading: (loading: boolean) => void;
@@ -118,6 +119,19 @@ export default function AuthForm({ setIsLoading, onBack }: AuthFormProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden" translate="no">
+      {/* Sol reklam alanı */}
+      <div className="hidden lg:flex flex-col items-center justify-center absolute left-0 top-0 bottom-0 w-[300px] z-20">
+        <div className="sticky top-8">
+          <AdComponent type="sidebar" />
+        </div>
+      </div>
+      {/* Sağ reklam alanı */}
+      <div className="hidden lg:flex flex-col items-center justify-center absolute right-0 top-0 bottom-0 w-[300px] z-20">
+        <div className="sticky top-8">
+          <AdComponent type="sidebar" />
+        </div>
+      </div>
+
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{

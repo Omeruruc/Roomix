@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { MessageCircle, UserCircle, Video } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import AuthForm from './components/AuthForm';
@@ -10,8 +11,9 @@ import ThemeToggle from './components/ThemeToggle';
 import { useAuth } from './hooks/useAuth';
 import { useTheme } from './contexts/ThemeContext';
 import { supabase } from './lib/supabase';
+import AdManager from './components/AdManager';
 
-function App() {
+function AppContent() {
   const { session, signOut } = useAuth();
   const { theme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +21,16 @@ function App() {
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [roomType, setRoomType] = useState<'study' | 'watch'>('study');
+  const location = useLocation();
+
+  // Reklamları yükle
+  useEffect(() => {
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch (err) {
+      console.error('Reklam yükleme hatası:', err);
+    }
+  }, []);
 
   // Sayfa ilk yüklendiğinde localStorage'dan oda bilgisini al
   useEffect(() => {
@@ -165,13 +177,26 @@ function App() {
             </div>
           </header>
 
-          <main className={`rounded-2xl overflow-hidden shadow-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
-            {selectedRoomId ? (
-              <RoomView session={session} roomId={selectedRoomId} onLeaveRoom={() => handleRoomSelect(null)} />
-            ) : (
-              <RoomList session={session} onRoomSelect={handleRoomSelect} />
-            )}
-          </main>
+          <div className="flex gap-8">
+            {/* Left Sidebar */}
+            <aside className="hidden lg:block w-[300px] flex-shrink-0">
+              <AdManager />
+            </aside>
+
+            {/* Main Content */}
+            <main className={`flex-1 rounded-2xl overflow-hidden shadow-xl ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
+              {selectedRoomId ? (
+                <RoomView session={session} roomId={selectedRoomId} onLeaveRoom={() => handleRoomSelect(null)} />
+              ) : (
+                <RoomList session={session} onRoomSelect={handleRoomSelect} />
+              )}
+            </main>
+
+            {/* Right Sidebar */}
+            <aside className="hidden xl:block w-[300px] flex-shrink-0">
+              <AdManager />
+            </aside>
+          </div>
         </div>
       )}
 
@@ -179,6 +204,14 @@ function App() {
         <ProfileSettings onClose={() => setShowProfileSettings(false)} />
       )}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
   );
 }
 
