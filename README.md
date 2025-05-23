@@ -12,7 +12,7 @@ Modern ve kullanıcı dostu bir  odalaşma  platformu.
 - 🎵 Medya paylaşım desteği
 - 😊 Emoji desteği
 - 🔍 Gelişmiş arama özellikleri
-- 🤖 Yapay Zeka Koç Desteği
+- 🤖 Yapay Zeka Koç Desteği(PRO ÖZELLİK)
   - Kişiselleştirilmiş öneriler
   - Akıllı yanıt önerileri
   - Otomatik içerik özetleme
