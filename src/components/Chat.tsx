@@ -307,7 +307,7 @@ export default function Chat({ session, roomId }: ChatProps) {
       className={`rounded-xl shadow-lg overflow-hidden ${
         theme === 'dark' ? 'bg-gray-800' : 'bg-white'
       }`}
-    >
+      >
       {/* Chat Header */}
       <div className={`p-4 border-b ${
           theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
@@ -315,7 +315,7 @@ export default function Chat({ session, roomId }: ChatProps) {
         <div className="flex items-center justify-between">
           <h2 className={`text-lg font-semibold ${
             theme === 'dark' ? 'text-white' : 'text-gray-900'
-          }`}>
+              }`}>
             {roomName}
           </h2>
           <div className="flex items-center gap-2">
@@ -324,12 +324,12 @@ export default function Chat({ session, roomId }: ChatProps) {
             }`} />
             <span className={`text-sm ${
               theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-            }`}>
+          }`}>
               {roomUsers} kullanıcı
             </span>
           </div>
-        </div>
-      </div>
+            </div>
+          </div>
 
       {/* Messages Container */}
       <div 
@@ -338,9 +338,9 @@ export default function Chat({ session, roomId }: ChatProps) {
         style={{ scrollBehavior: 'smooth' }}
       >
         <AnimatePresence mode="popLayout">
-          {messages.map((message) => (
-            <motion.div
-              key={message.id}
+            {messages.map((message) => (
+              <motion.div
+                key={message.id}
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ 
                 opacity: 1, 
@@ -364,21 +364,21 @@ export default function Chat({ session, roomId }: ChatProps) {
               }}
               className={`flex items-start gap-3 ${
                 message.user_id === session.user.id ? 'flex-row-reverse' : ''
-              }`}
-            >
+                }`}
+              >
               {/* Avatar */}
               <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
-                {message.avatar_url ? (
-                  <img
-                    src={message.avatar_url}
-                    alt={message.user_email}
+                    {message.avatar_url ? (
+                        <img
+                          src={message.avatar_url}
+                          alt={message.user_email}
                     className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                     onClick={() => message.avatar_url && setSelectedAvatar(message.avatar_url)}
-                  />
-                ) : (
+                        />
+                    ) : (
                   <div className={`w-full h-full flex items-center justify-center ${
                     theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'
-                  }`}>
+                      }`}>
                     <span className={`text-sm ${
                       theme === 'dark' ? 'text-gray-300' : 'text-gray-600'
                     }`}>
@@ -400,13 +400,13 @@ export default function Chat({ session, roomId }: ChatProps) {
                     : message.user_email}
                 </div>
                 <div className={`rounded-lg px-4 py-2 ${
-                  message.user_id === session.user.id
-                    ? theme === 'dark'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-blue-500 text-white'
-                    : theme === 'dark'
-                      ? 'bg-gray-700 text-white'
-                      : 'bg-gray-100 text-gray-900'
+                    message.user_id === session.user.id
+                      ? theme === 'dark'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-blue-500 text-white'
+                      : theme === 'dark'
+                    ? 'bg-gray-700 text-white'
+                    : 'bg-gray-100 text-gray-900'
                 }`}>
                   {message.message_type === 'image' ? (
                     <img 
@@ -418,36 +418,36 @@ export default function Chat({ session, roomId }: ChatProps) {
                   ) : (
                     message.content
                   )}
-                </div>
+                      </div>
                 <div className={`text-xs mt-1 ${
                   theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                }`}>
+                      }`}>
                   {new Date(message.created_at).toLocaleTimeString()}
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-        <div ref={messagesEndRef} />
-      </div>
+                      </div>
+                  </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          <div ref={messagesEndRef} />
+        </div>
 
       {/* Message Input */}
       <div className={`p-4 border-t ${
-        theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-      }`}>
+            theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+          }`}>
         <form onSubmit={handleSend} className="flex gap-2">
           <div className="relative flex-1">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Mesajınızı yazın..."
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Mesajınızı yazın..."
               className={`w-full px-4 py-2 rounded-lg ${
-                theme === 'dark'
-                  ? 'bg-gray-700 text-white placeholder-gray-400'
-                  : 'bg-gray-100 text-gray-900 placeholder-gray-500'
-              } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-            />
+                  theme === 'dark'
+                ? 'bg-gray-700 text-white placeholder-gray-400'
+                : 'bg-gray-100 text-gray-900 placeholder-gray-500'
+            } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+              />
             <input
               type="file"
               ref={fileInputRef}
@@ -489,19 +489,19 @@ export default function Chat({ session, roomId }: ChatProps) {
               </div>
             )}
           </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
             type="submit"
             className={`px-4 py-2 rounded-lg ${
-              theme === 'dark'
+                  theme === 'dark'
                 ? 'bg-blue-600 hover:bg-blue-700'
                 : 'bg-blue-500 hover:bg-blue-600'
             } text-white transition-colors`}
-          >
-            <Send className="w-5 h-5" />
-          </motion.button>
-        </form>
+              >
+                <Send className="w-5 h-5" />
+              </motion.button>
+          </form>
       </div>
 
       {/* Resim Modalı */}

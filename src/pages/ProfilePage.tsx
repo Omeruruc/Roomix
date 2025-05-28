@@ -298,7 +298,7 @@ export default function ProfilePage() {
                       Toplam Çalışma Süresi
                     </h3>
                     <p className={`text-2xl font-bold text-blue-500`}>
-                      {Math.floor(userStats.total_study_minutes / 60)} saat
+                      {userStats.total_study_minutes} dakika
                         </p>
                       </div>
                     </div>
