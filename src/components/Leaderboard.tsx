@@ -114,7 +114,9 @@ export default function Leaderboard({ roomId }: LeaderboardProps) {
     } backdrop-blur-lg rounded-2xl shadow-2xl border p-6 mb-6`}>
       <div className="flex items-center gap-2 mb-4">
         <Trophy className={`w-6 h-6 ${theme === 'dark' ? 'text-yellow-400' : 'text-yellow-500'}`} />
-        <h2 className="text-xl font-bold">Liderlik Tablosu</h2>
+        <h2 className={`text-xl font-bold ${
+          theme === 'dark' ? 'text-white' : 'text-gray-900'
+        }`}>Liderlik Tablosu</h2>
       </div>
 
       {isLoading ? (
@@ -122,12 +124,16 @@ export default function Leaderboard({ roomId }: LeaderboardProps) {
           <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       ) : leaderboardData.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
+        <div className={`text-center py-8 ${
+          theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+        }`}>
           Henüz timer verisi yok
         </div>
       ) : (
         <div className="overflow-hidden">
-          <div className="grid grid-cols-12 font-medium mb-2 px-4 py-2 text-sm text-gray-500">
+          <div className={`grid grid-cols-12 font-medium mb-2 px-4 py-2 text-sm ${
+            theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+          }`}>
             <div className="col-span-1">#</div>
             <div className="col-span-5">Kullanıcı</div>
             <div className="col-span-3">Konu</div>
@@ -150,13 +156,23 @@ export default function Leaderboard({ roomId }: LeaderboardProps) {
                   {user.rank}
                 </div>
                 <div className="col-span-5 flex items-center gap-2 overflow-hidden">
-                  <User className="w-5 h-5 flex-shrink-0" />
-                  <span className="truncate">{user.user_email}</span>
+                  <User className={`w-5 h-5 flex-shrink-0 ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                  }`} />
+                  <span className={`truncate ${
+                    theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}>{user.user_email}</span>
                 </div>
-                <div className="col-span-3 truncate">{user.subject || '-'}</div>
+                <div className={`col-span-3 truncate ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                }`}>{user.subject || '-'}</div>
                 <div className="col-span-3 flex items-center gap-1">
-                  <Clock className="w-4 h-4 flex-shrink-0" />
-                  <span>{formatTime(user.elapsed_time)}</span>
+                  <Clock className={`w-4 h-4 flex-shrink-0 ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                  }`} />
+                  <span className={`${
+                    theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}>{formatTime(user.elapsed_time)}</span>
                 </div>
               </motion.div>
             ))}

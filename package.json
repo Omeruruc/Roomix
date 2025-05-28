@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@emoji-mart/data": "^1.2.1",
+    "@emoji-mart/react": "^1.1.1",
     "@fal-ai/client": "^1.4.0",
     "@google/genai": "^1.0.0",
     "@google/generative-ai": "^0.24.1",

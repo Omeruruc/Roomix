@@ -165,7 +165,7 @@ export default function RoomSettings({ room, onClose, onRoomDeleted }: RoomSetti
       >
         <div className="flex items-center gap-2 mb-6">
           <Settings className="w-6 h-6 text-blue-400" />
-          <h2 className="text-xl font-bold">Room Settings</h2>
+          <h2 className="text-xl font-bold text-white">Room Settings</h2>
         </div>
 
         <form onSubmit={handleUpdateSettings} className="space-y-4">
@@ -273,7 +273,7 @@ export default function RoomSettings({ room, onClose, onRoomDeleted }: RoomSetti
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors text-white"
               disabled={isUpdating || isDeleting}
             >
               Cancel
@@ -298,7 +298,7 @@ export default function RoomSettings({ room, onClose, onRoomDeleted }: RoomSetti
             >
               <div className="flex items-center gap-2 mb-6 text-red-400">
                 <AlertCircle className="w-6 h-6" />
-                <h3 className="text-xl font-bold">Delete Room</h3>
+                <h3 className="text-xl font-bold text-white">Delete Room</h3>
               </div>
 
               <form onSubmit={handleDeleteRoom} className="space-y-4">
@@ -319,7 +319,7 @@ export default function RoomSettings({ room, onClose, onRoomDeleted }: RoomSetti
                   <button
                     type="button"
                     onClick={() => setShowDeleteConfirm(false)}
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors"
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors text-white"
                     disabled={isDeleting}
                   >
                     Cancel

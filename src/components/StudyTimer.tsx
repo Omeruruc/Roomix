@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { toast } from 'react-hot-toast';
 import { useTheme } from '../contexts/ThemeContext';
+import { useNavigate } from 'react-router-dom';
 
 interface StudyTimerProps {
   userId: string;
@@ -34,6 +35,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
   const timerRef = useRef<NodeJS.Timeout>();
   const localTimeRef = useRef<number>(0);
   const lastSyncTimeRef = useRef<number>(0);
+  const navigate = useNavigate();
   
   // Server'a timer durumunu güncelleyen fonksiyon
   const updateServerTimer = async (elapsedTime: number, isRunning: boolean, forceUpdate: boolean = false) => {
@@ -74,7 +76,7 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
       clearInterval(timerRef.current);
     }
     
-    timerRef.current = setInterval(() => {
+    timerRef.current = setInterval(async () => {
       const now = Date.now();
       const timeSinceLastSync = Math.floor((now - lastUpdateRef.current) / 1000);
       const newTime = lastSyncTimeRef.current + timeSinceLastSync;
@@ -88,6 +90,13 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
       // Her 5 saniyede bir server ile senkronize et
       if (isCurrentUser && timeSinceLastSync >= 5) {
         updateServerTimer(newTime, true, true);
+      }
+      // Her dolan dakikada total_study_minutes'i artır
+      if (isCurrentUser && newTime > 0 && newTime % 60 === 0) {
+        await supabase.rpc('update_study_minutes', {
+          user_id_param: userId,
+          minutes_param: 1
+        });
       }
     }, 1000);
   };
@@ -334,7 +343,13 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
           
           {/* Kullanıcı avatarı */}
           {avatar_url ? (
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-gray-600">
+            <div 
+              className="w-8 h-8 rounded-full overflow-hidden border border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => {
+                console.log('Profil sayfasına yönlendiriliyor:', userEmail);
+                navigate(`/user/${encodeURIComponent(userEmail)}`);
+              }}
+            >
               <img
                 src={avatar_url}
                 alt={getUserDisplayName()}
@@ -342,9 +357,15 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
               />
             </div>
           ) : (
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+            <div 
+              className={`w-8 h-8 rounded-full flex items-center justify-center ${
               theme === 'dark' ? 'bg-gray-700' : 'bg-gray-300'
-            } border border-gray-600`}>
+              } border border-gray-600 cursor-pointer hover:opacity-80 transition-opacity`}
+              onClick={() => {
+                console.log('Profil sayfasına yönlendiriliyor:', userEmail);
+                navigate(`/user/${encodeURIComponent(userEmail)}`);
+              }}
+            >
               <User className="w-4 h-4 text-gray-400" />
             </div>
           )}
@@ -430,8 +451,8 @@ export default function StudyTimer({ userId, userEmail, roomId, isCurrentUser = 
                 onClick={handleReset}
                 className={`px-6 py-2 ${
                   theme === 'dark'
-                    ? 'bg-gray-700/50 hover:bg-gray-700'
-                    : 'bg-gray-200 hover:bg-gray-300'
+                    ? 'bg-gray-700/50 hover:bg-gray-700 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
                 } rounded-xl font-semibold transition-all duration-200 flex items-center gap-2`}
               >
                 <RotateCcw className="w-5 h-5" />

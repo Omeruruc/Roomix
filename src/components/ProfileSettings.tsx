@@ -193,23 +193,34 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Kullanıcı bulunamadı');
       
+      console.log('Kullanıcı bulundu:', user.id);
+      
       // Dosya uzantısını al
       const fileExt = selectedFile.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `avatars/${fileName}`;
       
+      console.log('Dosya yolu:', filePath);
+      
       // Önce storage bucket'ın var olduğundan emin ol
       try {
-        await supabase.storage.getBucket('profiles');
+        const { data: bucketData, error: bucketError } = await supabase.storage.getBucket('profiles');
+        console.log('Bucket kontrolü:', bucketData, bucketError);
+        
+        if (bucketError) {
+          console.log('Bucket oluşturuluyor...');
+          const { data: createData, error: createError } = await supabase.storage.createBucket('profiles', {
+            public: true,
+            fileSizeLimit: 5 * 1024 * 1024 // 5MB
+          });
+          console.log('Bucket oluşturma sonucu:', createData, createError);
+        }
       } catch (error) {
-        // Bucket yoksa oluştur
-        await supabase.storage.createBucket('profiles', {
-          public: true,
-          fileSizeLimit: 5 * 1024 * 1024 // 5MB
-        });
+        console.error('Bucket kontrolü hatası:', error);
       }
       
       // Dosyayı storage'a yükle
+      console.log('Dosya yükleniyor...');
       const { error: uploadError } = await supabase.storage
         .from('profiles')
         .upload(filePath, selectedFile, {
@@ -217,12 +228,19 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
           upsert: true
         });
         
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Yükleme hatası:', uploadError);
+        throw uploadError;
+      }
+      
+      console.log('Dosya başarıyla yüklendi');
       
       // Yüklenen dosyanın public URL'ini al
       const { data: { publicUrl } } = supabase.storage
         .from('profiles')
         .getPublicUrl(filePath);
+      
+      console.log('Public URL:', publicUrl);
       
       // Profil tablosunu güncelle
       const { error: updateError } = await supabase
@@ -235,7 +253,12 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
           onConflict: 'id'
         });
         
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Profil güncelleme hatası:', updateError);
+        throw updateError;
+      }
+      
+      console.log('Profil başarıyla güncellendi');
       
       // State'i güncelle
       setAvatarUrl(publicUrl);
@@ -366,8 +389,8 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
                 disabled={isAvatarUploading}
                 className={`px-4 py-2 ${
                   theme === 'dark'
-                    ? 'bg-gray-700 hover:bg-gray-600'
-                    : 'bg-gray-200 hover:bg-gray-300'
+                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
                 } rounded-xl transition-colors flex items-center gap-2 ${
                   isAvatarUploading ? 'opacity-50 cursor-not-allowed' : ''
                 }`}

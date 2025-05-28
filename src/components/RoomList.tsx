@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import RoomSettings from './RoomSettings';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Room {
   id: string;
@@ -26,6 +27,7 @@ interface RoomListProps {
 
 export default function RoomList({ session, onRoomSelect }: RoomListProps) {
   const { theme } = useTheme();
+  const { setCurrentRoomId } = useAuth();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [filteredRooms, setFilteredRooms] = useState<Room[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -257,6 +259,7 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
       setMaxUsers(10);
       setVideoUrl('');
       setRoomType('study');
+      setCurrentRoomId(data.id);
       onRoomSelect(data.id);
       toast.success('Room created successfully!');
     } catch (error) {
@@ -295,6 +298,7 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
       if (existingMembership) {
         setShowJoinModal(false);
         setJoinPassword('');
+        setCurrentRoomId(selectedRoom.id);
         onRoomSelect(selectedRoom.id);
         return;
       }
@@ -324,8 +328,14 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
 
       if (joinError) throw joinError;
 
+      // Kullanıcının istatistiklerini güncelle
+      await supabase.rpc('increment_user_rooms_joined', {
+        user_id_param: session.user.id
+      });
+
       setShowJoinModal(false);
       setJoinPassword('');
+      setCurrentRoomId(selectedRoom.id);
       onRoomSelect(selectedRoom.id);
       toast.success('Successfully joined the room!');
     } catch (error) {
@@ -344,7 +354,7 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
         } backdrop-blur-lg rounded-2xl shadow-2xl p-6`}>
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
-          <h2 className={`text-xl font-bold ${
+          <h2 className={`text-3xl font-bold ${
             theme === 'dark'
               ? 'bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text'
               : 'text-blue-600'
@@ -430,8 +440,8 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                 onClick={() => setCreateRoomMode(false)}
                 className={`px-3 py-1.5 ${
                   theme === 'dark'
-                    ? 'bg-gray-700 hover:bg-gray-600'
-                    : 'bg-gray-200 hover:bg-gray-300'
+                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
                 } rounded-xl text-sm transition-colors`}
               >
                 Cancel
@@ -480,7 +490,7 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className={`text-lg font-semibold ${
-                      theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      theme === 'dark' ? 'text-white' : 'text-gray-800'
                     }`}>{room.name}</h3>
                     {room.owner_id === session.user.id && (
                       <span className={`px-2 py-1 ${
@@ -567,41 +577,61 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-gray-800 rounded-2xl p-6 max-w-md w-full"
+            className={`${
+              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+            } rounded-2xl p-6 max-w-md w-full`}
           >
-            <h2 className="text-xl font-bold mb-4">Create New {roomType === 'study' ? 'Study' : 'Watch'} Room</h2>
+            <h2 className={`text-xl font-bold mb-4 ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>Create New {roomType === 'study' ? 'Study' : 'Watch'} Room</h2>
             <form onSubmit={createRoom} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                }`}>
                   Room Name
                 </label>
                 <input
                   type="text"
                   value={newRoomName}
                   onChange={(e) => setNewRoomName(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-700 rounded-xl border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                  className={`w-full px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-gray-100 border-gray-200 text-gray-900 placeholder-gray-500'
+                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
                   placeholder="Enter room name"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                }`}>
                   Room Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                  }`} />
                   <input
                     type="password"
                     value={newRoomPassword}
                     onChange={(e) => setNewRoomPassword(e.target.value)}
-                    className="w-full pl-12 pr-4 py-2 bg-gray-700 rounded-xl border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                    className={`w-full pl-12 pr-4 py-2 ${
+                      theme === 'dark'
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                        : 'bg-gray-100 border-gray-200 text-gray-900 placeholder-gray-500'
+                    } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
                     placeholder="Create a password"
                     required
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                }`}>
                   Maximum Users
                 </label>
                 <input
@@ -610,27 +640,41 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                   max="100"
                   value={maxUsers}
                   onChange={(e) => setMaxUsers(parseInt(e.target.value))}
-                  className="w-full px-4 py-2 bg-gray-700 rounded-xl border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                  className={`w-full px-4 py-2 ${
+                    theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-gray-100 border-gray-200 text-gray-900 placeholder-gray-500'
+                  } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
                 />
               </div>
               
               {roomType === 'watch' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className={`block text-sm font-medium mb-1 ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                  }`}>
                     Video URL
                   </label>
                   <div className="relative">
-                    <Video className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <Video className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${
+                      theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                    }`} />
                     <input
                       type="url"
                       value={videoUrl}
                       onChange={(e) => setVideoUrl(e.target.value)}
-                      className="w-full pl-12 pr-4 py-2 bg-gray-700 rounded-xl border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                      className={`w-full pl-12 pr-4 py-2 ${
+                        theme === 'dark'
+                          ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                          : 'bg-gray-100 border-gray-200 text-gray-900 placeholder-gray-500'
+                      } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
                       placeholder="https://www.youtube.com/watch?v=..."
                       required
                     />
                   </div>
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className={`mt-1 text-xs ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                  }`}>
                     Use a video URL from platforms like YouTube, Vimeo, or any other supported platform.
                   </p>
                 </div>
@@ -640,7 +684,7 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors"
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors text-white"
                 >
                   Cancel
                 </button>
@@ -662,21 +706,33 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-gray-800 rounded-2xl p-6 max-w-md w-full"
+            className={`${
+              theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+            } rounded-2xl p-6 max-w-md w-full`}
           >
-            <h2 className="text-xl font-bold mb-4">Join Room: {selectedRoom.name}</h2>
+            <h2 className={`text-xl font-bold mb-4 ${
+              theme === 'dark' ? 'text-white' : 'text-gray-900'
+            }`}>Join Room: {selectedRoom.name}</h2>
             <form onSubmit={joinRoom} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${
+                  theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                }`}>
                   Room Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                  }`} />
                   <input
                     type="password"
                     value={joinPassword}
                     onChange={(e) => setJoinPassword(e.target.value)}
-                    className="w-full pl-12 pr-4 py-2 bg-gray-700 rounded-xl border border-gray-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200"
+                    className={`w-full pl-12 pr-4 py-2 ${
+                      theme === 'dark'
+                        ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                        : 'bg-gray-100 border-gray-200 text-gray-900 placeholder-gray-500'
+                    } rounded-xl border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all duration-200`}
                     placeholder="Enter room password"
                     required
                   />
@@ -687,7 +743,7 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                 <button
                   type="button"
                   onClick={() => setShowJoinModal(false)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors"
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-xl transition-colors text-white"
                 >
                   Cancel
                 </button>
@@ -763,8 +819,8 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                   onClick={() => setShowProModal(false)}
                   className={`px-4 py-2 ${
                     theme === 'dark'
-                      ? 'bg-gray-700 hover:bg-gray-600'
-                      : 'bg-gray-200 hover:bg-gray-300'
+                      ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                      : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
                   } rounded-xl transition-colors`}
                 >
                   İptal

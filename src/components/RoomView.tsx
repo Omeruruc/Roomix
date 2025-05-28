@@ -10,6 +10,8 @@ import RoomMembers from './RoomMembers';
 import Leaderboard from './Leaderboard';
 import VideoPlayer from './VideoPlayer';
 import AICoach from './AICoach';
+import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface RoomViewProps {
   session: Session;
@@ -33,6 +35,8 @@ interface RoomData {
 }
 
 export default function RoomView({ session, roomId, onLeaveRoom }: RoomViewProps) {
+  const { theme } = useTheme();
+  const { setCurrentRoomId } = useAuth();
   const [showChat, setShowChat] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -44,6 +48,18 @@ export default function RoomView({ session, roomId, onLeaveRoom }: RoomViewProps
   const [roomType, setRoomType] = useState<'study' | 'watch'>('study');
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [isPro, setIsPro] = useState(false);
+  const [manualLeave, setManualLeave] = useState(false);
+
+  // Sohbet açıldığında sayfayı mesaj yazma alanı görünecek kadar kaydır
+  useEffect(() => {
+    if (showChat) {
+      const scrollAmount = window.innerHeight * 0.3; // Ekran yüksekliğinin %30'u kadar kaydır
+      window.scrollTo({
+        top: window.scrollY + scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  }, [showChat]);
 
   useEffect(() => {
     const fetchRoomDetails = async () => {
@@ -214,6 +230,8 @@ export default function RoomView({ session, roomId, onLeaveRoom }: RoomViewProps
 
     return () => {
       channel.unsubscribe();
+      // Cleanup function: Sadece manuel leave veya atılma durumunda çıkış yapar
+      // Sayfa değiştirmede otomatik çıkış yapmaz
     };
   }, [roomId, session.user.id, onLeaveRoom]);
 
@@ -247,20 +265,37 @@ export default function RoomView({ session, roomId, onLeaveRoom }: RoomViewProps
         .eq('room_id', roomId)
         .eq('user_id', userId);
 
-      if (kickError) {
-        console.error('Kullanıcı odadan çıkarılırken hata oluştu:', kickError);
-        toast.error('Kullanıcı odadan çıkarılırken hata oluştu');
-        return;
-      }
+      if (kickError) throw kickError;
 
-      // Manuel olarak UI'dan kullanıcıyı kaldır (anında tepki için)
+      toast.success('Kullanıcı odadan atıldı.');
       setRoomUsers(current => current.filter(user => user.user_id !== userId));
-      
-      toast.success('Kullanıcı odadan çıkarıldı');
-    } catch (error) {
-      if (error instanceof Error) {
-        toast.error(error.message);
+      if (userId === session.user.id) {
+        setCurrentRoomId(null);
       }
+    } catch (error) {
+      console.error('Error kicking user:', error);
+      toast.error('Kullanıcı atılırken bir hata oluştu.');
+    }
+  };
+
+  // Manuel odadan ayrılma fonksiyonu
+  const handleManualLeaveRoom = async () => {
+    setManualLeave(true);
+    try {
+      const { error } = await supabase
+        .from('room_users')
+        .delete()
+        .eq('room_id', roomId)
+        .eq('user_id', session.user.id);
+
+      if (error) throw error;
+      
+      setCurrentRoomId(null);
+      onLeaveRoom();
+      toast.success('Odadan ayrıldınız.');
+    } catch (error) {
+      console.error('Error leaving room manually:', error);
+      toast.error('Odadan ayrılırken bir hata oluştu.');
     }
   };
 
@@ -274,31 +309,31 @@ export default function RoomView({ session, roomId, onLeaveRoom }: RoomViewProps
 
   return (
     <div className="max-w-6xl mx-auto px-4">
-      {/* Oda Başlığı */}
-      <div className="mb-8">
-        <div className="flex items-center justify-center mb-4">
-          <div className={`h-14 w-14 rounded-full ${
-            roomType === 'study' 
-              ? 'bg-blue-600' 
-              : 'bg-orange-500'
-          } flex items-center justify-center text-white shadow-lg`}>
+      {/* Oda Başlığı ve Kullanıcı Sayısı */}
+      <div className="flex flex-col items-center justify-center mb-8">
+        <div className={`flex items-center justify-center w-20 h-20 rounded-full shadow-lg mb-4 ${
+          roomType === 'study' ? 'bg-gradient-to-br from-blue-500 to-purple-600' : 'bg-gradient-to-br from-orange-500 to-pink-500'
+        }`}>
             {roomType === 'study' ? (
-              <BookOpen className="h-7 w-7" />
+            <BookOpen className="w-10 h-10 text-white" />
             ) : (
-              <Video className="h-7 w-7" />
+            <Video className="w-10 h-10 text-white" />
             )}
-          </div>
         </div>
-        <h1 className={`text-2xl md:text-3xl font-bold text-center bg-gradient-to-r ${
-          roomType === 'study'
-            ? 'from-blue-500 to-purple-600'
-            : 'from-orange-500 to-red-600'
-        } bg-clip-text text-transparent`}>
+        <h1 className="text-2xl md:text-3xl font-bold text-center bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent mb-2">
           {roomName}
         </h1>
-        <p className="text-center text-gray-500 dark:text-gray-400 mt-2 text-sm">
+        <p className="text-base text-gray-300 text-center font-medium">
           {roomUsers.length} kullanıcı ile aktif {roomType === 'study' ? 'çalışma' : 'izleme'} odası
         </p>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleManualLeaveRoom}
+          className="mt-4 px-5 py-2 bg-red-600 hover:bg-red-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-red-500/30 transition-all duration-200"
+        >
+          Odadan Ayrıl
+        </motion.button>
       </div>
 
       {roomType === 'study' ? (
@@ -399,7 +434,36 @@ export default function RoomView({ session, roomId, onLeaveRoom }: RoomViewProps
             </div>
           </div>
 
-          {showChat && <Chat session={session} roomId={roomId} />}
+          <AnimatePresence mode="wait">
+            {showChat && (
+              <motion.div
+                initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                animate={{ 
+                  opacity: 1, 
+                  y: 0, 
+                  scale: 1,
+                  transition: {
+                    type: "spring",
+                    stiffness: 260,
+                    damping: 20,
+                    mass: 0.8
+                  }
+                }}
+                exit={{ 
+                  opacity: 0, 
+                  y: 50, 
+                  scale: 0.9,
+                  transition: {
+                    duration: 0.2,
+                    ease: "easeInOut"
+                  }
+                }}
+                className="mt-6"
+              >
+                <Chat session={session} roomId={roomId} />
+              </motion.div>
+            )}
+          </AnimatePresence>
           
           <AnimatePresence>
             {showAICoach && (
@@ -444,13 +508,46 @@ export default function RoomView({ session, roomId, onLeaveRoom }: RoomViewProps
               <div className="animate-pulse mb-4 mx-auto w-16 h-16 rounded-full bg-orange-500/20 flex items-center justify-center">
                 <Video className="w-8 h-8 text-orange-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Video bulunamadı</h3>
-              <p className="text-gray-500 dark:text-gray-400">
+              <h3 className={`text-xl font-semibold mb-2 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                Video bulunamadı
+              </h3>
+              <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                 Bu izleme odasında henüz bir video URL'si bulunamadı.
                 {isOwner && " Oda ayarlarından bir video URL'si ekleyebilirsiniz."}
               </p>
             </div>
           )}
+
+          <AnimatePresence mode="wait">
+            {showChat && (
+              <motion.div
+                initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                animate={{ 
+                  opacity: 1, 
+                  y: 0, 
+                  scale: 1,
+                  transition: {
+                    type: "spring",
+                    stiffness: 260,
+                    damping: 20,
+                    mass: 0.8
+                  }
+                }}
+                exit={{ 
+                  opacity: 0, 
+                  y: 50, 
+                  scale: 0.9,
+                  transition: {
+                    duration: 0.2,
+                    ease: "easeInOut"
+                  }
+                }}
+                className="mt-6"
+              >
+                <Chat session={session} roomId={roomId} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </>
       )}
     </div>

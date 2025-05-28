@@ -284,14 +284,18 @@ export default function VideoPlayer({ session, roomId, videoUrl }: VideoPlayerPr
               <div className="animate-pulse mb-4 mx-auto w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
                 <Video className="w-8 h-8 text-red-400" />
               </div>
-              <h3 className="text-xl font-semibold mb-4">Video yüklenemiyor</h3>
+              <h3 className={`text-xl font-semibold mb-4 ${
+                theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}>Video yüklenemiyor</h3>
               <p className={`mb-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                 {errorMessage}
               </p>
               <div className={`p-4 rounded-lg ${
                 theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
               }`}>
-                <h4 className="font-medium mb-2">Desteklenen platformlar:</h4>
+                <h4 className={`font-medium mb-2 ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`}>Desteklenen platformlar:</h4>
                 <ul className={`text-sm list-disc list-inside grid grid-cols-1 sm:grid-cols-2 gap-1 ${
                   theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
                 }`}>
@@ -453,7 +457,9 @@ export default function VideoPlayer({ session, roomId, videoUrl }: VideoPlayerPr
             <div className={`p-4 rounded-2xl ${
               theme === 'dark' ? 'bg-gray-800' : 'bg-white'
             }`}>
-              <h2 className="text-lg font-semibold mb-2">Video Hakkında</h2>
+              <h2 className={`text-lg font-semibold mb-2 ${
+                theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`}>Video Hakkında</h2>
               <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>
                 Bu video oda yöneticisi tarafından paylaşılmıştır. Herkes videoyu eş zamanlı olarak izleyebilir.
                 Play/Pause, ileri-geri sarma gibi işlemleri yapabilirsiniz ve bu kontroller odadaki herkes için senkronize olacaktır.

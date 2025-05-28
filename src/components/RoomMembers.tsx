@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { UserX, Crown, User } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useNavigate } from 'react-router-dom';
 
 interface RoomMembersProps {
   users: Array<{
@@ -17,6 +18,7 @@ interface RoomMembersProps {
 }
 
 export default function RoomMembers({ users, isOwner, onKickUser, onClose }: RoomMembersProps) {
+  const navigate = useNavigate();
   const ownerUser = users[0]; // First user is always the owner
   const { theme } = useTheme();
 
@@ -43,13 +45,21 @@ export default function RoomMembers({ users, isOwner, onKickUser, onClose }: Roo
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="mb-6 bg-gray-800/50 backdrop-blur-sm p-6 rounded-2xl border border-gray-700/50"
+      className={`mb-6 ${
+        theme === 'dark' 
+          ? 'bg-gray-800/50 border-gray-700/50' 
+          : 'bg-white/80 border-gray-200'
+      } backdrop-blur-sm p-6 rounded-2xl border`}
     >
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">Oda Üyeleri ({users.length})</h2>
+        <h2 className={`text-xl font-semibold ${
+          theme === 'dark' ? 'text-white' : 'text-gray-900'
+        }`}>Oda Üyeleri ({users.length})</h2>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-white transition-colors"
+          className={`${
+            theme === 'dark' ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+          } transition-colors`}
         >
           Kapat
         </button>
@@ -58,18 +68,25 @@ export default function RoomMembers({ users, isOwner, onKickUser, onClose }: Roo
         {users.map((user) => (
           <div
             key={user.user_id}
-            className="flex items-center justify-between p-3 bg-gray-700/30 rounded-xl"
+            className={`flex items-center justify-between p-3 ${
+              theme === 'dark' ? 'bg-gray-700/30' : 'bg-gray-100/50'
+            } rounded-xl`}
           >
             <div className="flex items-center gap-3">
               {/* Avatar */}
+              <div 
+                className="w-10 h-10 rounded-full overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => {
+                  console.log('Profil sayfasına yönlendiriliyor:', user.user_email);
+                  navigate(`/user/${encodeURIComponent(user.user_email)}`);
+                }}
+              >
               {user.avatar_url ? (
-                <div className="w-10 h-10 rounded-full overflow-hidden border border-gray-600">
                   <img
                     src={user.avatar_url}
                     alt={getUserDisplayName(user)}
                     className="w-full h-full object-cover"
                   />
-                </div>
               ) : (
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                   theme === 'dark' ? 'bg-gray-700' : 'bg-gray-300'
@@ -77,17 +94,22 @@ export default function RoomMembers({ users, isOwner, onKickUser, onClose }: Roo
                   <User className="w-5 h-5 text-gray-400" />
                 </div>
               )}
+              </div>
               
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   {user.user_id === ownerUser?.user_id && (
                     <Crown className="w-5 h-5 text-yellow-500" />
                   )}
-                  <span className="font-medium">{getUserDisplayName(user)}</span>
+                  <span className={`font-medium ${
+                    theme === 'dark' ? 'text-white' : 'text-gray-900'
+                  }`}>{getUserDisplayName(user)}</span>
                 </div>
                 {/* İsim ve e-posta farklıysa, e-postayı da göster */}
                 {(user.first_name || user.last_name) && (
-                  <span className="text-sm text-gray-400">{user.user_email}</span>
+                  <span className={`text-sm ${
+                    theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
+                  }`}>{user.user_email}</span>
                 )}
               </div>
             </div>
