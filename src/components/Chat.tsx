@@ -36,6 +36,7 @@ export default function Chat({ session, roomId }: ChatProps) {
   const [roomName, setRoomName] = useState('');
   const [roomUsers, setRoomUsers] = useState(0);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -371,7 +372,8 @@ export default function Chat({ session, roomId }: ChatProps) {
                   <img
                     src={message.avatar_url}
                     alt={message.user_email}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => message.avatar_url && setSelectedAvatar(message.avatar_url)}
                   />
                 ) : (
                   <div className={`w-full h-full flex items-center justify-center ${
@@ -504,13 +506,16 @@ export default function Chat({ session, roomId }: ChatProps) {
 
       {/* Resim Modalı */}
       <AnimatePresence>
-        {selectedImage && (
+        {(selectedImage || selectedAvatar) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-            onClick={() => setSelectedImage(null)}
+            onClick={() => {
+              setSelectedImage(null);
+              setSelectedAvatar(null);
+            }}
           >
             <motion.div
               initial={{ scale: 0.9 }}
@@ -520,12 +525,15 @@ export default function Chat({ session, roomId }: ChatProps) {
               onClick={(e) => e.stopPropagation()}
             >
               <img
-                src={selectedImage || ''}
+                src={selectedImage || selectedAvatar || ''}
                 alt="Büyük resim"
                 className="max-w-full max-h-[90vh] rounded-lg object-contain"
               />
               <button
-                onClick={() => setSelectedImage(null)}
+                onClick={() => {
+                  setSelectedImage(null);
+                  setSelectedAvatar(null);
+                }}
                 className={`absolute top-4 right-4 p-2 rounded-full ${
                   theme === 'dark' ? 'bg-gray-800' : 'bg-white'
                 } shadow-lg`}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import ProfileSettings from '../components/ProfileSettings';
 import AdManager from '../components/AdManager';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,10 +23,11 @@ export default function ProfilePage() {
   const { theme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const [userStats, setUserStats] = useState<UserStats>({ total_rooms_joined: 0, total_study_minutes: 0 });
-  const [userProfile, setUserProfile] = useState<UserProfile>({ first_name: null, last_name: null, avatar_url: null });
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [coverImage, setCoverImage] = useState<string | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -82,7 +83,7 @@ export default function ProfilePage() {
   }, [user]);
 
   const getUserDisplayName = () => {
-    if (userProfile.first_name && userProfile.last_name) {
+    if (userProfile?.first_name && userProfile.last_name) {
       return `${userProfile.first_name} ${userProfile.last_name}`;
     }
     return user?.email || 'Kullanıcı';
@@ -242,8 +243,9 @@ export default function ProfilePage() {
                 {/* Profil Fotoğrafı */}
                 <div className="absolute -bottom-16 left-8">
                   <div className="relative">
-                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 bg-gray-200 dark:bg-gray-700">
-                      {userProfile.avatar_url ? (
+                    <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 bg-gray-200 dark:bg-gray-700 cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => userProfile?.avatar_url && setSelectedAvatar(userProfile.avatar_url)}>
+                      {userProfile?.avatar_url ? (
                         <img
                           src={userProfile.avatar_url}
                           alt="Profil"
@@ -377,6 +379,41 @@ export default function ProfilePage() {
       {showSettings && (
         <ProfileSettings onClose={() => setShowSettings(false)} />
       )}
+
+      {/* Resim Modalı */}
+      <AnimatePresence>
+        {selectedAvatar && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setSelectedAvatar(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              className="relative max-w-4xl max-h-[90vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={selectedAvatar}
+                alt="Büyük profil fotoğrafı"
+                className="max-w-full max-h-[90vh] rounded-lg object-contain"
+              />
+              <button
+                onClick={() => setSelectedAvatar(null)}
+                className={`absolute top-4 right-4 p-2 rounded-full ${
+                  theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+                } shadow-lg`}
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 } 

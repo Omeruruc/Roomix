@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
-import { User, Clock, Users, ArrowLeft } from 'lucide-react';
+import { User, Clock, Users, ArrowLeft, X } from 'lucide-react';
 
 interface UserStats {
   total_rooms_joined: number;
@@ -25,6 +25,7 @@ export default function UserProfilePage() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userStats, setUserStats] = useState<UserStats>({ total_rooms_joined: 0, total_study_minutes: 0 });
   const [loading, setLoading] = useState(true);
+  const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -128,7 +129,8 @@ export default function UserProfilePage() {
               {/* Profil Fotoğrafı */}
               <div className="absolute -bottom-16 left-8">
                 <div className="relative">
-                  <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 bg-gray-200 dark:bg-gray-700">
+                  <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 bg-gray-200 dark:bg-gray-700 cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => userProfile.avatar_url && setSelectedAvatar(userProfile.avatar_url)}>
                     {userProfile.avatar_url ? (
                       <img
                         src={userProfile.avatar_url}
@@ -202,6 +204,41 @@ export default function UserProfilePage() {
               </motion.div>
             </div>
           </div>
+
+          {/* Resim Modalı */}
+          <AnimatePresence>
+            {selectedAvatar && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+                onClick={() => setSelectedAvatar(null)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9 }}
+                  animate={{ scale: 1 }}
+                  exit={{ scale: 0.9 }}
+                  className="relative max-w-4xl max-h-[90vh]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <img
+                    src={selectedAvatar}
+                    alt="Büyük profil fotoğrafı"
+                    className="max-w-full max-h-[90vh] rounded-lg object-contain"
+                  />
+                  <button
+                    onClick={() => setSelectedAvatar(null)}
+                    className={`absolute top-4 right-4 p-2 rounded-full ${
+                      theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+                    } shadow-lg`}
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </div>
     </div>
