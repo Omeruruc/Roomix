@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { geminiService } from '../lib/geminiService';
+import { useAuth } from '../contexts/AuthContext';
 
 export const GeminiChat: React.FC = () => {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || !user) return;
 
     const userMessage = input.trim();
     setInput('');
@@ -16,7 +18,7 @@ export const GeminiChat: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await geminiService.generateResponse(userMessage);
+      const response = await geminiService.generateResponse(user.id, userMessage);
       setMessages(prev => [...prev, { role: 'assistant', content: response }]);
     } catch (error) {
       console.error('Sohbet hatası:', error);
