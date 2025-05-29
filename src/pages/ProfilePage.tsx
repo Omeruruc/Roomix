@@ -333,7 +333,7 @@ export default function ProfilePage() {
                 <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-purple-500 to-pink-600"
-                    style={{ width: `${Math.min((userStats.total_rooms_joined / 50) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((userStats.total_rooms_joined / 300) * 100, 100)}%` }}
                   />
                 </div>
               </motion.div>

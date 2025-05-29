@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { MessageSquare, Users, Trophy, BookOpen, Video, BrainCircuit } from 'lucide-react';
+import { MessageSquare, Users, Trophy, BookOpen, Video, BrainCircuit, Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
@@ -46,9 +46,11 @@ export default function RoomView({ session, roomId, onLeaveRoom }: RoomViewProps
   const [roomName, setRoomName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [roomType, setRoomType] = useState<'study' | 'watch'>('study');
-  const [videoUrl, setVideoUrl] = useState<string>('');
-  const [isPro, setIsPro] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
   const [manualLeave, setManualLeave] = useState(false);
+  const [isPro, setIsPro] = useState(false);
 
   // Sohbet açıldığında sayfayı mesaj yazma alanı görünecek kadar kaydır
   useEffect(() => {
@@ -299,6 +301,41 @@ export default function RoomView({ session, roomId, onLeaveRoom }: RoomViewProps
     }
   };
 
+  // Yeni mesajları takip et
+  useEffect(() => {
+    if (!showChat) {
+      const channel = supabase
+        .channel('new_messages')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `room_id=eq.${roomId}`
+          },
+          (payload) => {
+            const newMessage = payload.new as any;
+            if (newMessage.user_id !== session.user.id) {
+              setHasNewMessages(true);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        channel.unsubscribe();
+      };
+    }
+  }, [roomId, session.user.id, showChat]);
+
+  // Sohbet açıldığında bildirimi sıfırla
+  useEffect(() => {
+    if (showChat) {
+      setHasNewMessages(false);
+    }
+  }, [showChat]);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -369,10 +406,13 @@ export default function RoomView({ session, roomId, onLeaveRoom }: RoomViewProps
                 setShowLeaderboard(false);
                 setShowAICoach(false);
               }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2"
+              className="relative px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white font-semibold shadow-lg hover:shadow-blue-500/30 transition-all duration-200 flex items-center gap-2"
             >
               <MessageSquare className="w-5 h-5" />
               {showChat ? 'Kronometreleri Göster' : 'Sohbeti Aç'}
+              {hasNewMessages && !showChat && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse" />
+              )}
             </motion.button>
             <div className="relative group">
               <motion.button

@@ -18,6 +18,7 @@ interface Room {
   owner_id: string;
   room_type: 'study' | 'watch';
   video_url?: string;
+  has_unread_messages: boolean;
 }
 
 interface RoomListProps {
@@ -108,7 +109,30 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
       return;
     }
 
-    const sortedRooms = (data || []).sort((a, b) => {
+    // Okunmamış mesajları kontrol et
+    const roomsWithUnreadStatus = await Promise.all((data || []).map(async (room) => {
+      const { data: lastMessage } = await supabase
+        .from('messages')
+        .select('created_at')
+        .eq('room_id', room.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      const { data: lastRead } = await supabase
+        .from('room_read_status')
+        .select('last_read_at')
+        .eq('room_id', room.id)
+        .eq('user_id', session.user.id)
+        .single();
+
+      return {
+        ...room,
+        has_unread_messages: lastMessage && lastRead && new Date(lastMessage.created_at) > new Date(lastRead.last_read_at)
+      };
+    }));
+
+    const sortedRooms = roomsWithUnreadStatus.sort((a, b) => {
       if ((a.owner_id === session.user.id) === (b.owner_id === session.user.id)) {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
@@ -499,6 +523,12 @@ export default function RoomList({ session, onRoomSelect }: RoomListProps) {
                           : 'bg-blue-100 text-blue-600'
                       } text-xs rounded-full`}>
                         Owner
+                      </span>
+                    )}
+                    {room.has_unread_messages && (
+                      <span className="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full flex items-center gap-1">
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                        Yeni Mesaj
                       </span>
                     )}
                     <span className={`px-2 py-1 ${
