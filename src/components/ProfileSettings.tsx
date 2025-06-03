@@ -116,57 +116,57 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
           toast.error('E-posta güncellemek için şifrenizi girmelisiniz');
           setIsUpdating(false);
           return;
-        }
-
-        // Önce oturum açarak kimlik doğrulaması yap
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+      }
+      
+      // Önce oturum açarak kimlik doğrulaması yap
+      const { error: signInError } = await supabase.auth.signInWithPassword({
           email: user.email || '',
           password: emailPassword,
-        });
-        
-        if (signInError) {
-          toast.error('Geçersiz şifre. Lütfen şifrenizi kontrol edin.');
+      });
+      
+      if (signInError) {
+        toast.error('Geçersiz şifre. Lütfen şifrenizi kontrol edin.');
           setIsUpdating(false);
-          return;
-        }
-
+        return;
+      }
+      
         const { error: emailError } = await supabase.auth.updateUser({ 
-          email: newEmail 
-        });
-        
+        email: newEmail 
+      });
+      
         if (emailError) {
           if (emailError.message.includes('email_address_invalid')) {
-            toast.error('Bu e-posta adresi kullanılamaz. Lütfen farklı bir e-posta deneyin.');
-          } else {
+          toast.error('Bu e-posta adresi kullanılamaz. Lütfen farklı bir e-posta deneyin.');
+        } else {
             throw emailError;
-          }
-          setIsUpdating(false);
-          return;
         }
+      setIsUpdating(false);
+      return;
+    }
 
         toast.success('E-postanızı kontrol edin ve onaylayın');
         hasUpdates = true;
       }
-
+      
       // Şifre güncelleme
       if (newPassword) {
         if (!currentPassword) {
           toast.error('Şifre güncellemek için mevcut şifrenizi girmelisiniz');
           setIsUpdating(false);
-          return;
-        }
-
+        return;
+      }
+      
         const { error: passwordError } = await supabase.auth.updateUser({ 
-          password: newPassword 
-        });
-        
+        password: newPassword 
+      });
+      
         if (passwordError) throw passwordError;
         toast.success('Şifreniz başarıyla güncellendi');
         hasUpdates = true;
       }
-
+      
       if (hasUpdates) {
-        onClose();
+      onClose();
       } else {
         toast('Herhangi bir değişiklik yapılmadı');
       }
@@ -302,16 +302,16 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
         } rounded-2xl p-6 max-w-md w-full h-auto relative`}
       >
         <div className="sticky top-0 right-0 z-10 flex justify-end">
-          <button
-            onClick={onClose}
+        <button
+          onClick={onClose}
             className={`p-2 rounded-lg ${
-              theme === 'dark'
+            theme === 'dark'
                 ? 'hover:bg-gray-700/50 text-gray-300'
                 : 'hover:bg-gray-100/50 text-gray-600'
             } transition-colors`}
-          >
-            <X className="w-5 h-5" />
-          </button>
+        >
+          <X className="w-5 h-5" />
+        </button>
         </div>
         <div className="flex items-center justify-between mb-6">
           <h2 className={`text-xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Profil Ayarları</h2>
@@ -527,19 +527,19 @@ export default function ProfileSettings({ onClose }: ProfileSettingsProps) {
           </div>
 
           {/* Tek Kaydet Butonu */}
-          <motion.button
-            type="submit"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            disabled={isUpdating}
+            <motion.button
+              type="submit"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              disabled={isUpdating}
             className={`w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl text-white font-semibold shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 transition-all duration-200 flex items-center justify-center gap-2 ${
-              isUpdating ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-          >
-            {isUpdating ? <Loader className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                isUpdating ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isUpdating ? <Loader className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
             Bilgileri Kaydet
-          </motion.button>
-        </form>
+            </motion.button>
+          </form>
       </motion.div>
     </div>
   );
