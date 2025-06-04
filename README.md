@@ -94,4 +94,4 @@ Bu proje MIT lisansı altında lisanslanmıştır. Daha fazla bilgi için `LICEN
 
 Proje Sahibi - [@Omeruruc]
 
-Proje Linki: [hhttps://work-chat.netlify.app/]
+Proje Linki: [https://roomiks.netlify.app/]
